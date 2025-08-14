@@ -1,6 +1,7 @@
 {
   "images" : [
     {
+      "filename" : "Exported PNG image.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -12,6 +13,7 @@
           "value" : "dark"
         }
       ],
+      "filename" : "Exported PNG image 1.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -23,6 +25,7 @@
           "value" : "tinted"
         }
       ],
+      "filename" : "Exported PNG image 5.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"

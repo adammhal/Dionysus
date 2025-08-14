@@ -6,7 +6,22 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		F082400C2E3BE68E0070A0C2 /* TVServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F082400B2E3BE68E0070A0C2 /* TVServices.framework */; };
+		F08240132E3BE68E0070A0C2 /* DionysusTopShelf.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F08240092E3BE68D0070A0C2 /* DionysusTopShelf.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		F082401C2E3BF3670070A0C2 /* ColorThiefSwift in Frameworks */ = {isa = PBXBuildFile; productRef = F082401B2E3BF3670070A0C2 /* ColorThiefSwift */; };
+		F085E5BB2E35FADD00C84043 /* ColorThiefSwift in Frameworks */ = {isa = PBXBuildFile; productRef = F085E5BA2E35FADD00C84043 /* ColorThiefSwift */; };
+		F085E5BD2E35FB2D00C84043 /* ColorThiefSwift in Frameworks */ = {isa = PBXBuildFile; productRef = F085E5BC2E35FB2D00C84043 /* ColorThiefSwift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
+		F08240112E3BE68E0070A0C2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F085E5372E32EB8F00C84043 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F08240082E3BE68D0070A0C2;
+			remoteInfo = DionysusTopShelf;
+		};
 		F085E5522E32EB9000C84043 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = F085E5372E32EB8F00C84043 /* Project object */;
@@ -21,17 +36,103 @@
 			remoteGlobalIDString = F085E53E2E32EB8F00C84043;
 			remoteInfo = Dionysus;
 		};
+		F085E5942E35490B00C84043 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F085E5372E32EB8F00C84043 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F085E5812E35490900C84043;
+			remoteInfo = DionysusTV;
+		};
+		F085E59E2E35490B00C84043 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F085E5372E32EB8F00C84043 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F085E5812E35490900C84043;
+			remoteInfo = DionysusTV;
+		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		F08240182E3BE68E0070A0C2 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				F08240132E3BE68E0070A0C2 /* DionysusTopShelf.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		F08240092E3BE68D0070A0C2 /* DionysusTopShelf.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DionysusTopShelf.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		F082400B2E3BE68E0070A0C2 /* TVServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = TVServices.framework; path = Library/Frameworks/TVServices.framework; sourceTree = DEVELOPER_DIR; };
 		F085E53F2E32EB8F00C84043 /* Dionysus.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Dionysus.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F085E5512E32EB9000C84043 /* DionysusTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DionysusTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F085E55B2E32EB9000C84043 /* DionysusUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DionysusUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F085E5822E35490900C84043 /* DionysusTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DionysusTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F085E5932E35490B00C84043 /* DionysusTVTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DionysusTVTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F085E59D2E35490B00C84043 /* DionysusTVUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DionysusTVUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		F08240172E3BE68E0070A0C2 /* Exceptions for "DionysusTopShelf" folder in "DionysusTopShelf" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = F08240082E3BE68D0070A0C2 /* DionysusTopShelf */;
+		};
+		F082401A2E3BE6C30070A0C2 /* Exceptions for "Dionysus" folder in "DionysusTopShelf" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Secrets.swift,
+				SharedCode.swift,
+			);
+			target = F08240082E3BE68D0070A0C2 /* DionysusTopShelf */;
+		};
+		F085E5722E33DE7D00C84043 /* Exceptions for "Dionysus" folder in "Dionysus" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = F085E53E2E32EB8F00C84043 /* Dionysus */;
+		};
+		F085E5B62E354AE200C84043 /* Exceptions for "Dionysus" folder in "DionysusTV" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Secrets.swift,
+				SharedCode.swift,
+			);
+			target = F085E5812E35490900C84043 /* DionysusTV */;
+		};
+		F085E5B82E354AFE00C84043 /* Exceptions for "DionysusTV" folder in "DionysusTV" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = F085E5812E35490900C84043 /* DionysusTV */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		F082400D2E3BE68E0070A0C2 /* DionysusTopShelf */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				F08240172E3BE68E0070A0C2 /* Exceptions for "DionysusTopShelf" folder in "DionysusTopShelf" target */,
+			);
+			path = DionysusTopShelf;
+			sourceTree = "<group>";
+		};
 		F085E5412E32EB8F00C84043 /* Dionysus */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				F085E5722E33DE7D00C84043 /* Exceptions for "Dionysus" folder in "Dionysus" target */,
+				F085E5B62E354AE200C84043 /* Exceptions for "Dionysus" folder in "DionysusTV" target */,
+				F082401A2E3BE6C30070A0C2 /* Exceptions for "Dionysus" folder in "DionysusTopShelf" target */,
+			);
 			path = Dionysus;
 			sourceTree = "<group>";
 		};
@@ -45,13 +146,51 @@
 			path = DionysusUITests;
 			sourceTree = "<group>";
 		};
+		F085E56E2E33DE2C00C84043 /* Fonts */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Fonts;
+			sourceTree = "<group>";
+		};
+		F085E5752E34538800C84043 /* Icons */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Icons;
+			sourceTree = "<group>";
+		};
+		F085E5832E35490900C84043 /* DionysusTV */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				F085E5B82E354AFE00C84043 /* Exceptions for "DionysusTV" folder in "DionysusTV" target */,
+			);
+			path = DionysusTV;
+			sourceTree = "<group>";
+		};
+		F085E5962E35490B00C84043 /* DionysusTVTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DionysusTVTests;
+			sourceTree = "<group>";
+		};
+		F085E5A02E35490B00C84043 /* DionysusTVUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DionysusTVUITests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		F08240062E3BE68D0070A0C2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F082400C2E3BE68E0070A0C2 /* TVServices.framework in Frameworks */,
+				F082401C2E3BF3670070A0C2 /* ColorThiefSwift in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F085E53C2E32EB8F00C84043 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F085E5BD2E35FB2D00C84043 /* ColorThiefSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -69,15 +208,52 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F085E57F2E35490900C84043 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F085E5BB2E35FADD00C84043 /* ColorThiefSwift in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F085E5902E35490B00C84043 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F085E59A2E35490B00C84043 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		F082400A2E3BE68E0070A0C2 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				F082400B2E3BE68E0070A0C2 /* TVServices.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		F085E5362E32EB8F00C84043 = {
 			isa = PBXGroup;
 			children = (
+				F085E5752E34538800C84043 /* Icons */,
+				F085E56E2E33DE2C00C84043 /* Fonts */,
 				F085E5412E32EB8F00C84043 /* Dionysus */,
 				F085E5542E32EB9000C84043 /* DionysusTests */,
 				F085E55E2E32EB9000C84043 /* DionysusUITests */,
+				F085E5832E35490900C84043 /* DionysusTV */,
+				F085E5962E35490B00C84043 /* DionysusTVTests */,
+				F085E5A02E35490B00C84043 /* DionysusTVUITests */,
+				F082400D2E3BE68E0070A0C2 /* DionysusTopShelf */,
+				F082400A2E3BE68E0070A0C2 /* Frameworks */,
 				F085E5402E32EB8F00C84043 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -88,6 +264,10 @@
 				F085E53F2E32EB8F00C84043 /* Dionysus.app */,
 				F085E5512E32EB9000C84043 /* DionysusTests.xctest */,
 				F085E55B2E32EB9000C84043 /* DionysusUITests.xctest */,
+				F085E5822E35490900C84043 /* DionysusTV.app */,
+				F085E5932E35490B00C84043 /* DionysusTVTests.xctest */,
+				F085E59D2E35490B00C84043 /* DionysusTVUITests.xctest */,
+				F08240092E3BE68D0070A0C2 /* DionysusTopShelf.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -95,6 +275,29 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		F08240082E3BE68D0070A0C2 /* DionysusTopShelf */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F08240142E3BE68E0070A0C2 /* Build configuration list for PBXNativeTarget "DionysusTopShelf" */;
+			buildPhases = (
+				F08240052E3BE68D0070A0C2 /* Sources */,
+				F08240062E3BE68D0070A0C2 /* Frameworks */,
+				F08240072E3BE68D0070A0C2 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				F082400D2E3BE68E0070A0C2 /* DionysusTopShelf */,
+			);
+			name = DionysusTopShelf;
+			packageProductDependencies = (
+				F082401B2E3BF3670070A0C2 /* ColorThiefSwift */,
+			);
+			productName = DionysusTopShelf;
+			productReference = F08240092E3BE68D0070A0C2 /* DionysusTopShelf.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		F085E53E2E32EB8F00C84043 /* Dionysus */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F085E5652E32EB9000C84043 /* Build configuration list for PBXNativeTarget "Dionysus" */;
@@ -109,9 +312,12 @@
 			);
 			fileSystemSynchronizedGroups = (
 				F085E5412E32EB8F00C84043 /* Dionysus */,
+				F085E56E2E33DE2C00C84043 /* Fonts */,
+				F085E5752E34538800C84043 /* Icons */,
 			);
 			name = Dionysus;
 			packageProductDependencies = (
+				F085E5BC2E35FB2D00C84043 /* ColorThiefSwift */,
 			);
 			productName = Dionysus;
 			productReference = F085E53F2E32EB8F00C84043 /* Dionysus.app */;
@@ -163,6 +369,77 @@
 			productReference = F085E55B2E32EB9000C84043 /* DionysusUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		F085E5812E35490900C84043 /* DionysusTV */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F085E5A52E35490B00C84043 /* Build configuration list for PBXNativeTarget "DionysusTV" */;
+			buildPhases = (
+				F085E57E2E35490900C84043 /* Sources */,
+				F085E57F2E35490900C84043 /* Frameworks */,
+				F085E5802E35490900C84043 /* Resources */,
+				F08240182E3BE68E0070A0C2 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F08240122E3BE68E0070A0C2 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				F085E5832E35490900C84043 /* DionysusTV */,
+			);
+			name = DionysusTV;
+			packageProductDependencies = (
+				F085E5BA2E35FADD00C84043 /* ColorThiefSwift */,
+			);
+			productName = DionysusTV;
+			productReference = F085E5822E35490900C84043 /* DionysusTV.app */;
+			productType = "com.apple.product-type.application";
+		};
+		F085E5922E35490B00C84043 /* DionysusTVTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F085E5A82E35490B00C84043 /* Build configuration list for PBXNativeTarget "DionysusTVTests" */;
+			buildPhases = (
+				F085E58F2E35490B00C84043 /* Sources */,
+				F085E5902E35490B00C84043 /* Frameworks */,
+				F085E5912E35490B00C84043 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F085E5952E35490B00C84043 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				F085E5962E35490B00C84043 /* DionysusTVTests */,
+			);
+			name = DionysusTVTests;
+			packageProductDependencies = (
+			);
+			productName = DionysusTVTests;
+			productReference = F085E5932E35490B00C84043 /* DionysusTVTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		F085E59C2E35490B00C84043 /* DionysusTVUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F085E5AB2E35490B00C84043 /* Build configuration list for PBXNativeTarget "DionysusTVUITests" */;
+			buildPhases = (
+				F085E5992E35490B00C84043 /* Sources */,
+				F085E59A2E35490B00C84043 /* Frameworks */,
+				F085E59B2E35490B00C84043 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F085E59F2E35490B00C84043 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				F085E5A02E35490B00C84043 /* DionysusTVUITests */,
+			);
+			name = DionysusTVUITests;
+			packageProductDependencies = (
+			);
+			productName = DionysusTVUITests;
+			productReference = F085E59D2E35490B00C84043 /* DionysusTVUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -173,6 +450,9 @@
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
+					F08240082E3BE68D0070A0C2 = {
+						CreatedOnToolsVersion = 16.0;
+					};
 					F085E53E2E32EB8F00C84043 = {
 						CreatedOnToolsVersion = 16.0;
 					};
@@ -183,6 +463,17 @@
 					F085E55A2E32EB9000C84043 = {
 						CreatedOnToolsVersion = 16.0;
 						TestTargetID = F085E53E2E32EB8F00C84043;
+					};
+					F085E5812E35490900C84043 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					F085E5922E35490B00C84043 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = F085E5812E35490900C84043;
+					};
+					F085E59C2E35490B00C84043 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = F085E5812E35490900C84043;
 					};
 				};
 			};
@@ -195,6 +486,9 @@
 			);
 			mainGroup = F085E5362E32EB8F00C84043;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				F085E5B92E35FADC00C84043 /* XCRemoteSwiftPackageReference "ColorThiefSwift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F085E5402E32EB8F00C84043 /* Products */;
 			projectDirPath = "";
@@ -203,11 +497,22 @@
 				F085E53E2E32EB8F00C84043 /* Dionysus */,
 				F085E5502E32EB9000C84043 /* DionysusTests */,
 				F085E55A2E32EB9000C84043 /* DionysusUITests */,
+				F085E5812E35490900C84043 /* DionysusTV */,
+				F085E5922E35490B00C84043 /* DionysusTVTests */,
+				F085E59C2E35490B00C84043 /* DionysusTVUITests */,
+				F08240082E3BE68D0070A0C2 /* DionysusTopShelf */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		F08240072E3BE68D0070A0C2 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F085E53D2E32EB8F00C84043 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -229,9 +534,37 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F085E5802E35490900C84043 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F085E5912E35490B00C84043 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F085E59B2E35490B00C84043 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		F08240052E3BE68D0070A0C2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F085E53B2E32EB8F00C84043 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -253,9 +586,35 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F085E57E2E35490900C84043 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F085E58F2E35490B00C84043 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F085E5992E35490B00C84043 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		F08240122E3BE68E0070A0C2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F08240082E3BE68D0070A0C2 /* DionysusTopShelf */;
+			targetProxy = F08240112E3BE68E0070A0C2 /* PBXContainerItemProxy */;
+		};
 		F085E5532E32EB9000C84043 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = F085E53E2E32EB8F00C84043 /* Dionysus */;
@@ -266,9 +625,75 @@
 			target = F085E53E2E32EB8F00C84043 /* Dionysus */;
 			targetProxy = F085E55C2E32EB9000C84043 /* PBXContainerItemProxy */;
 		};
+		F085E5952E35490B00C84043 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F085E5812E35490900C84043 /* DionysusTV */;
+			targetProxy = F085E5942E35490B00C84043 /* PBXContainerItemProxy */;
+		};
+		F085E59F2E35490B00C84043 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F085E5812E35490900C84043 /* DionysusTV */;
+			targetProxy = F085E59E2E35490B00C84043 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		F08240152E3BE68E0070A0C2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = DionysusTopShelf/DionysusTopShelf.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BV94GNRP6Y;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DionysusTopShelf/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = DionysusTopShelf;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = adammmhal.DionysusTV.DionysusTopShelf;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 18.0;
+			};
+			name = Debug;
+		};
+		F08240162E3BE68E0070A0C2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = DionysusTopShelf/DionysusTopShelf.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BV94GNRP6Y;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DionysusTopShelf/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = DionysusTopShelf;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = adammmhal.DionysusTV.DionysusTopShelf;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 18.0;
+			};
+			name = Release;
+		};
 		F085E5632E32EB9000C84043 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -396,13 +821,14 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"Dionysus/Preview Content\"";
+				DEVELOPMENT_TEAM = BV94GNRP6Y;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Dionysus/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -410,6 +836,9 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = adammmhal.Dionysus;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -424,13 +853,14 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"Dionysus/Preview Content\"";
+				DEVELOPMENT_TEAM = BV94GNRP6Y;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Dionysus/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -438,6 +868,9 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = adammmhal.Dionysus;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -512,9 +945,148 @@
 			};
 			name = Release;
 		};
+		F085E5A62E35490B00C84043 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "App Icon & Top Shelf Image";
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"DionysusTV/Preview Content\"";
+				DEVELOPMENT_TEAM = BV94GNRP6Y;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DionysusTV/Info.plist;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Automatic;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = adammmhal.DionysusTV;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 18.0;
+			};
+			name = Debug;
+		};
+		F085E5A72E35490B00C84043 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "App Icon & Top Shelf Image";
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"DionysusTV/Preview Content\"";
+				DEVELOPMENT_TEAM = BV94GNRP6Y;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DionysusTV/Info.plist;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Automatic;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = adammmhal.DionysusTV;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 18.0;
+			};
+			name = Release;
+		};
+		F085E5A92E35490B00C84043 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = adammmhal.DionysusTVTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DionysusTV.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/DionysusTV";
+				TVOS_DEPLOYMENT_TARGET = 18.0;
+			};
+			name = Debug;
+		};
+		F085E5AA2E35490B00C84043 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = adammmhal.DionysusTVTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DionysusTV.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/DionysusTV";
+				TVOS_DEPLOYMENT_TARGET = 18.0;
+			};
+			name = Release;
+		};
+		F085E5AC2E35490B00C84043 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = adammmhal.DionysusTVUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TEST_TARGET_NAME = DionysusTV;
+				TVOS_DEPLOYMENT_TARGET = 18.0;
+			};
+			name = Debug;
+		};
+		F085E5AD2E35490B00C84043 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = adammmhal.DionysusTVUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TEST_TARGET_NAME = DionysusTV;
+				TVOS_DEPLOYMENT_TARGET = 18.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		F08240142E3BE68E0070A0C2 /* Build configuration list for PBXNativeTarget "DionysusTopShelf" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F08240152E3BE68E0070A0C2 /* Debug */,
+				F08240162E3BE68E0070A0C2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		F085E53A2E32EB8F00C84043 /* Build configuration list for PBXProject "Dionysus" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -551,7 +1123,63 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		F085E5A52E35490B00C84043 /* Build configuration list for PBXNativeTarget "DionysusTV" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F085E5A62E35490B00C84043 /* Debug */,
+				F085E5A72E35490B00C84043 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F085E5A82E35490B00C84043 /* Build configuration list for PBXNativeTarget "DionysusTVTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F085E5A92E35490B00C84043 /* Debug */,
+				F085E5AA2E35490B00C84043 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F085E5AB2E35490B00C84043 /* Build configuration list for PBXNativeTarget "DionysusTVUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F085E5AC2E35490B00C84043 /* Debug */,
+				F085E5AD2E35490B00C84043 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		F085E5B92E35FADC00C84043 /* XCRemoteSwiftPackageReference "ColorThiefSwift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/yamoridon/ColorThiefSwift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.5.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		F082401B2E3BF3670070A0C2 /* ColorThiefSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F085E5B92E35FADC00C84043 /* XCRemoteSwiftPackageReference "ColorThiefSwift" */;
+			productName = ColorThiefSwift;
+		};
+		F085E5BA2E35FADD00C84043 /* ColorThiefSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F085E5B92E35FADC00C84043 /* XCRemoteSwiftPackageReference "ColorThiefSwift" */;
+			productName = ColorThiefSwift;
+		};
+		F085E5BC2E35FB2D00C84043 /* ColorThiefSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F085E5B92E35FADC00C84043 /* XCRemoteSwiftPackageReference "ColorThiefSwift" */;
+			productName = ColorThiefSwift;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = F085E5372E32EB8F00C84043 /* Project object */;
 }

@@ -7,7 +7,45 @@
 		<key>Dionysus.xcscheme_^#shared#^_</key>
 		<dict>
 			<key>orderHint</key>
+			<integer>1</integer>
+		</dict>
+		<key>DionysusTV.xcscheme_^#shared#^_</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>2</integer>
+		</dict>
+		<key>DionysusTopShelf.xcscheme_^#shared#^_</key>
+		<dict>
+			<key>orderHint</key>
 			<integer>0</integer>
+		</dict>
+	</dict>
+	<key>SuppressBuildableAutocreation</key>
+	<dict>
+		<key>F08240082E3BE68D0070A0C2</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>F085E53E2E32EB8F00C84043</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>F085E5502E32EB9000C84043</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>F085E55A2E32EB9000C84043</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>F085E5812E35490900C84043</key>
+		<dict>
+			<key>primary</key>
+			<true/>
 		</dict>
 	</dict>
 </dict>
