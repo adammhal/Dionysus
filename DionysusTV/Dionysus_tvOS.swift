@@ -1,10 +1,11 @@
 import SwiftUI
 import TVServices
 
+// MARK: - Navigation & App Entry
+
 @MainActor
 class DeepLinkManager: ObservableObject {
     @Published var navigationPath = NavigationPath()
-    @Published var sourceSheetQuery: String?
 
     func handleURL(_ url: URL) {
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: true) else {
@@ -13,15 +14,6 @@ class DeepLinkManager: ObservableObject {
         
         let host = components.host
         let pathComponents = components.path.split(separator: "/").map(String.init)
-        
-        if host == "sources" {
-            if let queryItem = components.queryItems?.first(where: { $0.name == "query" }) {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    self.sourceSheetQuery = queryItem.value
-                }
-            }
-            return
-        }
         
         guard (host == "movie" || host == "tv"),
               pathComponents.count == 1,
@@ -58,6 +50,8 @@ struct DionysusAppTV: App {
         }
     }
 }
+
+// MARK: - ViewModels
 
 @MainActor
 class HomeViewModel: ObservableObject {
@@ -204,6 +198,12 @@ class GenreViewModel: ObservableObject {
     }
 }
 
+// MARK: - Navigation Model
+struct SourcesNavigation: Hashable {
+    let searchQuery: String
+}
+
+// MARK: - Main Views
 struct ContentView: View {
     @StateObject private var homeViewModel = HomeViewModel()
     @StateObject private var deepLinkManager = DeepLinkManager()
@@ -223,13 +223,14 @@ struct ContentView: View {
             .navigationDestination(for: Genre.self) { genre in
                 GenreResultsView(genre: genre)
             }
+            .navigationDestination(for: SourcesNavigation.self) { navigation in
+                SourcesView(searchQuery: navigation.searchQuery)
+            }
         }
+        .environmentObject(deepLinkManager)
         .preferredColorScheme(.dark)
         .onOpenURL { url in
             deepLinkManager.handleURL(url)
-        }
-        .sheet(item: $deepLinkManager.sourceSheetQuery) { query in
-            LibraryActionSheetView(searchQuery: query)
         }
     }
 }
@@ -237,33 +238,29 @@ struct ContentView: View {
 struct HomeView: View {
     @ObservedObject var viewModel: HomeViewModel
     @State private var themeColors: [Color] = [.purple.opacity(0.8), .blue.opacity(0.8)]
-    
+
     var body: some View {
         ZStack(alignment: .topLeading) {
-            BlobBackgroundView(colors: themeColors, isAnimating: true)
+            BlobBackgroundView(colors: themeColors, isAnimating: false)
                 .ignoresSafeArea()
-                .animation(.easeInOut(duration: 1.0), value: themeColors)
 
             if viewModel.isLoading {
                 ProgressView()
             } else if let errorMessage = viewModel.errorMessage {
                 ErrorView(message: errorMessage) { Task { await viewModel.loadAllContent() } }
             } else {
-                VStack(alignment: .leading, spacing: 0) {
-                    DionysusTitleView()
-                        .padding(.horizontal, 60)
-                        .padding(.top, 40)
-                        .padding(.bottom, 20)
-                    
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 60) {
-                            MediaCarouselView(title: "Trending Movies", items: viewModel.trendingMovies, themeColors: $themeColors)
-                            MediaCarouselView(title: "Trending TV Shows", items: viewModel.trendingShows, themeColors: $themeColors)
-                            MediaCarouselView(title: "Popular Movies", items: viewModel.popularMovies, themeColors: $themeColors)
-                            MediaCarouselView(title: "Popular TV Shows", items: viewModel.popularShows, themeColors: $themeColors)
-                        }
-                        .padding([.bottom,.top], 40)
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 24) {
+                        DionysusTitleView()
+                            .padding(.top, 28)
+                            .padding(.horizontal, 60)
+
+                        MediaCarouselView(title: "Trending", items: viewModel.trendingMovies, themeColors: $themeColors)
+                        MediaCarouselView(title: "Popular Movies", items: viewModel.popularMovies, themeColors: $themeColors)
+                        MediaCarouselView(title: "Trending Shows", items: viewModel.trendingShows, themeColors: $themeColors)
+                        MediaCarouselView(title: "Popular Shows", items: viewModel.popularShows, themeColors: $themeColors)
                     }
+                    .padding(.bottom, 80)
                 }
             }
         }
@@ -275,31 +272,28 @@ struct MediaCarouselView: View {
     let title: String
     let items: [MediaItem]
     @Binding var themeColors: [Color]
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text(title).font(.title2).fontWeight(.bold).padding(.horizontal, 60)
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.title2)
+                .fontWeight(.bold)
+                .padding(.horizontal, 60)
+
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 40) {
-                    ForEach(items) { item in
+                LazyHStack(spacing: 40) {
+                    ForEach(items, id: \.id) { item in
                         NavigationLink(value: item) {
                             MediaPosterView(media: item.underlyingMedia)
                                 .frame(width: 300, height: 450)
                         }
                         .buttonStyle(.card)
-                        .onFocusChange { isFocused in
-                            if isFocused {
-                                Task {
-                                    await updateThemeColors(for: item.underlyingMedia)
-                                }
-                            }
-                        }
                     }
                 }
                 .padding(.horizontal, 60)
-                .padding(.vertical, 40)
+                .padding(.vertical, 24)
             }
-            .clipped(antialiased: false)
+            .clipped(antialiased: true)
         }
     }
 
@@ -315,8 +309,10 @@ struct MediaCarouselView: View {
             let newColors = primaryUIColors.map { Color($0).darker(by: 0.6) }
             
             await MainActor.run {
-                if !newColors.isEmpty {
-                    self.themeColors = newColors
+                withAnimation(.easeInOut(duration: 1.0)) {
+                    if !newColors.isEmpty {
+                        self.themeColors = newColors
+                    }
                 }
             }
         } catch {
@@ -370,11 +366,11 @@ struct SearchView: View {
 }
 
 struct MediaDetailView: View {
+    @EnvironmentObject var deepLinkManager: DeepLinkManager
     let media: any Media
     
     @State private var trailerURL: URL?
     @State private var showContent = false
-    @State private var librarySearchQuery: String?
     @State private var themeColors: [Color] = []
     @State private var showTrailerQRCode = false
     
@@ -389,7 +385,6 @@ struct MediaDetailView: View {
             } else {
                 BlobBackgroundView(colors: themeColors, isAnimating: true)
                     .ignoresSafeArea()
-                    .transition(.opacity.animation(.easeInOut))
             }
 
             ScrollView {
@@ -397,7 +392,8 @@ struct MediaDetailView: View {
                     HeaderView(media: media, releaseYear: releaseYear)
                     
                     ActionButtonsView(trailerURL: trailerURL, addToAction: {
-                        librarySearchQuery = (media is TVShow) ? "\(media.title) complete" : "\(media.title) \(releaseYear)"
+                        let query = (media is TVShow) ? "\(media.title) complete" : "\(media.title) \(releaseYear)"
+                        deepLinkManager.navigationPath.append(SourcesNavigation(searchQuery: query))
                     }, playTrailerAction: {
                         showTrailerQRCode = true
                     })
@@ -411,9 +407,6 @@ struct MediaDetailView: View {
                 .padding(60)
                 .opacity(showContent ? 1 : 0)
             }
-        }
-        .sheet(item: $librarySearchQuery) { query in
-            LibraryActionSheetView(searchQuery: query)
         }
         .sheet(isPresented: $showTrailerQRCode) {
             if let trailerURL = trailerURL {
@@ -463,59 +456,174 @@ struct MediaDetailView: View {
     }
 }
 
-func generateQRCode(from string: String) -> UIImage? {
-    let data = string.data(using: String.Encoding.ascii)
-
-    if let filter = CIFilter(name: "CIQRCodeGenerator") {
-        filter.setValue(data, forKey: "inputMessage")
-        let transform = CGAffineTransform(scaleX: 10, y: 10)
-
-        if let output = filter.outputImage?.transformed(by: transform) {
-            let context = CIContext()
-            if let cgImage = context.createCGImage(output, from: output.extent) {
-                return UIImage(cgImage: cgImage)
-            }
+struct SourcesView: View {
+    @StateObject private var viewModel = LibraryViewModel()
+    let searchQuery: String
+    
+    @State private var selectedQuality: String = "All"
+    @State private var selectedAVQuality: AVQuality = .normal
+    
+    private let qualityOptions = ["All", "2160p", "1080p", "720p"]
+    
+    private var finalSearchQuery: String {
+        var query = searchQuery
+        if let term = selectedAVQuality.queryTerm {
+            query += " \(term)"
         }
+        return query
     }
-    return nil
-}
+    
+    private var filteredTorrents: [Torrent] {
+        let filtered = viewModel.torrents.filter {
+            (selectedQuality == "All" || $0.quality == selectedQuality)
+        }
 
-struct TrailerQRSheetView: View {
-    let trailerURL: URL
-
-    var body: some View {
-        VStack(spacing: 40) {
-            Text("Scan to Watch Trailer")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-
-            if let qrCodeImage = generateQRCode(from: trailerURL.absoluteString) {
-                Image(uiImage: qrCodeImage)
-                    .resizable()
-                    .interpolation(.none)
-                    .scaledToFit()
-                    .frame(width: 400, height: 400)
-                    .background(Color.white)
-                    .cornerRadius(20)
-                    .padding()
-                    .background(.thinMaterial)
-                    .cornerRadius(30)
-
-            } else {
-                Text("Could not generate QR code.")
-                    .font(.title2)
+        return filtered.sorted { t1, t2 in
+            let isActionable1 = t1.magnet != nil && !(t1.infoHash.flatMap { viewModel.existingTorrentHashes.contains($0) } ?? false)
+            let isActionable2 = t2.magnet != nil && !(t2.infoHash.flatMap { viewModel.existingTorrentHashes.contains($0) } ?? false)
+            
+            if isActionable1 && !isActionable2 {
+                return true
+            } else if !isActionable1 && isActionable2 {
+                return false
             }
             
-            Text("Point your phone's camera at the QR code to open the trailer on your device.")
-                .font(.title3)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 500)
+            let seeders1 = Int(t1.seeders ?? "0") ?? 0
+            let seeders2 = Int(t2.seeders ?? "0") ?? 0
+            return seeders1 > seeders2
         }
-        .padding(60)
+    }
+    
+    var body: some View {
+        ZStack {
+            ScrollView {
+                VStack(spacing: 30) {
+                    VStack(spacing: 30) {
+                        Picker("Quality", selection: $selectedQuality) { ForEach(qualityOptions, id: \.self) { Text($0) } }.pickerStyle(.segmented)
+                        Picker("Audio/Video", selection: $selectedAVQuality) {
+                            ForEach(AVQuality.allCases) { Text($0.rawValue).tag($0) }
+                        }.pickerStyle(.segmented)
+                    }
+                    .focusSection()
+
+                    if viewModel.isLoading {
+                        ProgressView().padding(.top, 100)
+                    } else if let errorMessage = viewModel.errorMessage {
+                        ErrorView(message: errorMessage) { Task { await viewModel.fetchTorrents(for: finalSearchQuery) } }
+                    } else if filteredTorrents.isEmpty {
+                        Text("No Sources Found").font(.title2).padding(.top, 100)
+                    } else {
+                        VStack(spacing: 20) {
+                            ForEach(filteredTorrents) { torrent in
+                                let isAdded = torrent.infoHash.flatMap { viewModel.existingTorrentHashes.contains($0) } ?? false
+                                TorrentRowView(torrent: torrent, isAlreadyAdded: isAdded) { magnet in
+                                    Task { await viewModel.addTorrent(magnet: magnet) }
+                                }
+                                .buttonStyle(.card)
+                            }
+                        }
+                        .focusSection()
+                    }
+                }
+                .padding(60)
+            }
+            .navigationTitle("Sources for \(searchQuery)")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        Task { await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: true) }
+                    } label: {
+                        Label("", systemImage: "arrow.clockwise")
+                    }
+                }
+            }
+            .task { await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: false) }
+            .onChange(of: selectedAVQuality) { Task { await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: false) } }
+            
+            if viewModel.addState != .idle {
+                StatusOverlayView(addState: $viewModel.addState)
+            }
+        }
     }
 }
 
+
+// MARK: - Detail Views
+struct TVShowDetailContentView: View {
+    @EnvironmentObject var deepLinkManager: DeepLinkManager
+    @StateObject private var viewModel = TVDetailViewModel()
+    let show: TVShow
+    let themeColor: Color?
+    @State private var selectedSeason: Int = 1
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 30) {
+            if viewModel.isLoadingDetails { ProgressView() }
+            else if let details = viewModel.showDetails {
+                Text("Seasons").font(.title2).fontWeight(.bold)
+                let seasons = details.seasons.filter { $0.seasonNumber > 0 }
+                if !seasons.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack {
+                            ForEach(seasons) { season in
+                                Button("Season \(season.seasonNumber)") {
+                                    selectedSeason = season.seasonNumber
+                                }
+                                .buttonStyle(.bordered)
+                                .background(selectedSeason == season.seasonNumber ? Color.blue.opacity(0.3) : Color.clear)
+                                .cornerRadius(12)
+                            }
+                        }
+                    }
+                    .onChange(of: selectedSeason) { Task { await viewModel.fetchSeason(tvShowId: show.id, seasonNumber: selectedSeason) } }
+                }
+                
+                if viewModel.isLoadingSeason { ProgressView() }
+                else if let seasonDetails = viewModel.selectedSeasonDetails {
+                    VStack(alignment: .leading, spacing: 20) {
+                        Button(action: {
+                            let query = "\(show.title) S\(String(format: "%02d", selectedSeason))"
+                            deepLinkManager.navigationPath.append(SourcesNavigation(searchQuery: query))
+                        }) {
+                            HStack(spacing: 15) {
+                                Image(systemName: "sparkles").font(.title3).foregroundStyle(.yellow)
+                                VStack(alignment: .leading) {
+                                    Text("Season \(selectedSeason)").font(.caption).foregroundColor(.secondary)
+                                    Text("Search for Full Season Pack").font(.headline).fontWeight(.bold)
+                                }
+                            }
+                        }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 15)
+                                .fill((themeColor ?? .blue).opacity(0.25))
+                                .shadow(color: (themeColor ?? .blue).opacity(0.5), radius: 8, x: 0, y: 4)
+                        )
+                        
+                        Divider()
+                        
+                        if seasonDetails.episodes.isEmpty {
+                            Text("No episodes found for this season.").padding()
+                        } else {
+                            ForEach(seasonDetails.episodes) { episode in
+                                EpisodeRowView(showTitle: show.title, episode: episode) { query in
+                                    deepLinkManager.navigationPath.append(SourcesNavigation(searchQuery: query))
+                                }
+                                Divider()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .task {
+            await viewModel.fetchDetails(for: show.id)
+            if let firstSeason = viewModel.showDetails?.seasons.first(where: { $0.seasonNumber > 0 }) ?? viewModel.showDetails?.seasons.first { selectedSeason = firstSeason.seasonNumber }
+        }
+    }
+}
+
+// MARK: - Component Views
 struct DionysusTitleView: View {
     var body: some View {
         Text("Dionysus")
@@ -526,23 +634,31 @@ struct DionysusTitleView: View {
 
 struct MediaPosterView: View {
     let media: any Media
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         CachedAsyncImage(url: media.posterPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w500\($0)") }) { phase in
             switch phase {
-            case .empty: ProgressView()
-            case .success(let image): image.resizable()
-            case .failure: Image(systemName: "film.slash").font(.largeTitle).foregroundColor(.secondary)
-            @unknown default: EmptyView()
+            case .empty:
+                ProgressView()
+            case .success(let image):
+                image
+                    .resizable()
+            case .failure:
+                Image(systemName: "film.slash")
+                    .font(.largeTitle)
+                    .foregroundColor(.secondary)
+            @unknown default:
+                EmptyView()
             }
         }
         .aspectRatio(2/3, contentMode: .fit)
-        .background(.gray.opacity(0.3))
-        .cornerRadius(12)
-        .shadow(radius: 10)
+        .cornerRadius(8)
+        .scaleEffect(isFocused ? 1.06 : 1.0)
+        .animation(.easeInOut(duration: 0.18), value: isFocused)
+        .focused($isFocused)
     }
 }
-
 struct SearchResultRow: View {
     let media: any Media
     
@@ -622,152 +738,6 @@ enum AVQuality: String, CaseIterable, Identifiable {
     }
 }
 
-struct LibraryActionSheetView: View {
-    @StateObject private var viewModel = LibraryViewModel()
-    let searchQuery: String
-    @Environment(\.dismiss) private var dismiss
-    
-    @State private var selectedQuality: String = "All"
-    @State private var selectedAVQuality: AVQuality = .normal
-    @State private var filterText: String = ""
-    
-    private let qualityOptions = ["All", "2160p", "1080p", "720p"]
-    
-    private var finalSearchQuery: String {
-        var query = searchQuery
-        if let term = selectedAVQuality.queryTerm {
-            query += " \(term)"
-        }
-        return query
-    }
-    
-    private var filteredTorrents: [Torrent] {
-        var torrents = viewModel.torrents
-        if selectedQuality != "All" { torrents = torrents.filter { $0.quality == selectedQuality } }
-        if !filterText.isEmpty { torrents = torrents.filter { $0.name.localizedCaseInsensitiveContains(filterText) } }
-        return torrents
-    }
-    
-    var body: some View {
-        ZStack {
-            VStack(spacing: 30) {
-                HStack {
-                    Text("Sources for \(searchQuery)")
-                        .font(.largeTitle)
-                    Spacer()
-                    Button {
-                        Task {
-                            await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: true)
-                        }
-                    } label: {
-                        Label("Refresh", systemImage: "arrow.clockwise")
-                    }
-                }
-                .padding(.horizontal, 60)
-                
-                VStack(spacing: 30) {
-                    Picker("Quality", selection: $selectedQuality) { ForEach(qualityOptions, id: \.self) { Text($0) } }.pickerStyle(.segmented)
-                    Picker("Audio/Video", selection: $selectedAVQuality) {
-                        ForEach(AVQuality.allCases) { Text($0.rawValue).tag($0) }
-                    }.pickerStyle(.segmented)
-                }
-                .padding(.horizontal, 60)
-                
-                if viewModel.isLoading { ProgressView() }
-                else if let errorMessage = viewModel.errorMessage { ErrorView(message: errorMessage) { Task { await viewModel.fetchTorrents(for: finalSearchQuery) } } }
-                else if filteredTorrents.isEmpty { Text("No Sources Found").font(.title2) }
-                else {
-                    List(filteredTorrents) { torrent in
-                        let isAdded = torrent.infoHash.flatMap { viewModel.existingTorrentHashes.contains($0) } ?? false
-                        TorrentRowView(torrent: torrent, isAlreadyAdded: isAdded) { magnet in Task { await viewModel.addTorrent(magnet: magnet) } }
-                    }
-                }
-            }
-            .padding(.top, 60)
-            .task { await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: false) }
-            .onChange(of: selectedAVQuality) { Task { await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: false) } }
-            .onChange(of: viewModel.addState) { if viewModel.addState == .success { DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { dismiss() } } }
-            
-            if viewModel.addState != .idle {
-                StatusOverlayView(addState: $viewModel.addState)
-            }
-        }
-    }
-}
-
-struct TVShowDetailContentView: View {
-    @StateObject private var viewModel = TVDetailViewModel()
-    let show: TVShow
-    let themeColor: Color?
-    @State private var selectedSeason: Int = 1
-    @State private var librarySearchQuery: String?
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 30) {
-            if viewModel.isLoadingDetails { ProgressView() }
-            else if let details = viewModel.showDetails {
-                Text("Seasons").font(.title2).fontWeight(.bold)
-                let seasons = details.seasons.filter { $0.seasonNumber > 0 }
-                if !seasons.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack {
-                            ForEach(seasons) { season in
-                                Button("Season \(season.seasonNumber)") {
-                                    selectedSeason = season.seasonNumber
-                                }
-                                .buttonStyle(.bordered)
-                                .background(selectedSeason == season.seasonNumber ? Color.blue.opacity(0.3) : Color.clear)
-                                .cornerRadius(12)
-                            }
-                        }
-                    }
-                    .onChange(of: selectedSeason) { Task { await viewModel.fetchSeason(tvShowId: show.id, seasonNumber: selectedSeason) } }
-                }
-                
-                if viewModel.isLoadingSeason { ProgressView() }
-                else if let seasonDetails = viewModel.selectedSeasonDetails {
-                    VStack(alignment: .leading, spacing: 20) {
-                        Button(action: {
-                            let query = "\(show.title) S\(String(format: "%02d", selectedSeason))"
-                            librarySearchQuery = query
-                        }) {
-                            HStack(spacing: 15) {
-                                Image(systemName: "sparkles").font(.title3).foregroundStyle(.yellow)
-                                VStack(alignment: .leading) {
-                                    Text("Season \(selectedSeason)").font(.caption).foregroundColor(.secondary)
-                                    Text("Search for Full Season Pack").font(.headline).fontWeight(.bold)
-                                }
-                            }
-                        }
-                        .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: 15)
-                                .fill((themeColor ?? .blue).opacity(0.25))
-                                .shadow(color: (themeColor ?? .blue).opacity(0.5), radius: 8, x: 0, y: 4)
-                        )
-                        
-                        Divider()
-                        
-                        if seasonDetails.episodes.isEmpty {
-                            Text("No episodes found for this season.").padding()
-                        } else {
-                            ForEach(seasonDetails.episodes) { episode in
-                                EpisodeRowView(showTitle: show.title, episode: episode) { query in librarySearchQuery = query }
-                                Divider()
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        .task {
-            await viewModel.fetchDetails(for: show.id)
-            if let firstSeason = viewModel.showDetails?.seasons.first(where: { $0.seasonNumber > 0 }) ?? viewModel.showDetails?.seasons.first { selectedSeason = firstSeason.seasonNumber }
-        }
-        .sheet(item: $librarySearchQuery) { query in LibraryActionSheetView(searchQuery: query) }
-    }
-}
-
 struct EpisodeRowView: View {
     let showTitle: String
     let episode: Episode
@@ -831,23 +801,8 @@ struct BlobBackgroundView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            ZStack {
-                if colors.count > 1 {
-                    Circle().fill(colors[0]).frame(width: geometry.size.width * 0.6, height: geometry.size.width * 0.6).offset(x: 0, y: 0).offset(x: animate && isAnimating ? geometry.size.width * 0.25 : -geometry.size.width * 0.25, y: animate && isAnimating ? -geometry.size.height * 0.25 : geometry.size.height * 0.25)
-                    Circle().fill(colors[1]).frame(width: geometry.size.width * 0.7, height: geometry.size.width * 0.7).offset(x: 0, y: 0).offset(x: animate && isAnimating ? -geometry.size.width * 0.25 : geometry.size.width * 0.25, y: animate && isAnimating ? geometry.size.height * 0.25 : -geometry.size.height * 0.25)
-                    Circle().fill(colors[0]).frame(width: geometry.size.width * 0.5, height: geometry.size.width * 0.5).offset(x: 0, y: 0).offset(x: animate && isAnimating ? -geometry.size.width * 0.1 : geometry.size.width * 0.1, y: animate && isAnimating ? -geometry.size.height * 0.25 : geometry.size.height * 0.25)
-                    Circle().fill(colors[1]).frame(width: geometry.size.width * 0.55, height: geometry.size.width * 0.55).offset(x: 0, y: 0).offset(x: animate && isAnimating ? geometry.size.width * 0.1 : -geometry.size.width * 0.1, y: animate && isAnimating ? geometry.size.height * 0.25 : -geometry.size.height * 0.25)
-                } else {
-                     LinearGradient(colors: colors, startPoint: .top, endPoint: .bottom)
-                }
-            }
-            .blur(radius: 60)
-            .animation(isAnimating ? .easeInOut(duration: 15).repeatForever(autoreverses: true) : nil, value: animate)
-            .onAppear {
-                if isAnimating {
-                    animate = true
-                }
-            }
+            LinearGradient(gradient: Gradient(colors: colors), startPoint: .topLeading, endPoint: .bottomTrailing)
+                .ignoresSafeArea()
         }
     }
 }
@@ -896,7 +851,14 @@ struct TorrentRowView: View {
     let addAction: (String) -> Void
     
     var body: some View {
-        Button(action: { if let magnet = torrent.magnet { addAction(magnet) } }) {
+        let isActionable = torrent.magnet != nil && !isAlreadyAdded
+        
+        Button(action: {
+            guard isActionable, let magnet = torrent.magnet else {
+                return
+            }
+            addAction(magnet)
+        }) {
             HStack {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(torrent.name).font(.headline).lineLimit(2)
@@ -917,14 +879,69 @@ struct TorrentRowView: View {
                 }
             }
         }
-        .disabled(torrent.magnet == nil || isAlreadyAdded)
+        .opacity(isActionable ? 1.0 : 0.4)
     }
+}
+
+
+// MARK: - Utilities & Extensions
+struct TrailerQRSheetView: View {
+    let trailerURL: URL
+
+    var body: some View {
+        VStack(spacing: 40) {
+            Text("Scan to Watch Trailer")
+                .font(.largeTitle)
+                .fontWeight(.bold)
+
+            if let qrCodeImage = generateQRCode(from: trailerURL.absoluteString) {
+                Image(uiImage: qrCodeImage)
+                    .resizable()
+                    .interpolation(.none)
+                    .scaledToFit()
+                    .frame(width: 400, height: 400)
+                    .background(Color.white)
+                    .cornerRadius(20)
+                    .padding()
+                    .background(.thinMaterial)
+                    .cornerRadius(30)
+
+            } else {
+                Text("Could not generate QR code.")
+                    .font(.title2)
+            }
+            
+            Text("Point your phone's camera at the QR code to open the trailer on your device.")
+                .font(.title3)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 500)
+        }
+        .padding(60)
+    }
+}
+
+func generateQRCode(from string: String) -> UIImage? {
+    let data = string.data(using: String.Encoding.ascii)
+
+    if let filter = CIFilter(name: "CIQRCodeGenerator") {
+        filter.setValue(data, forKey: "inputMessage")
+        let transform = CGAffineTransform(scaleX: 10, y: 10)
+
+        if let output = filter.outputImage?.transformed(by: transform) {
+            let context = CIContext()
+            if let cgImage = context.createCGImage(output, from: output.extent) {
+                return UIImage(cgImage: cgImage)
+            }
+        }
+    }
+    return nil
 }
 
 struct CachedAsyncImage<Content: View>: View {
     let url: URL?
     @ViewBuilder let content: (AsyncImagePhase) -> Content
-    
+
     var body: some View {
         if let url = url, let image = ImageCache.shared.get(forKey: url) {
             content(.success(Image(uiImage: image)))
@@ -937,9 +954,12 @@ struct CachedAsyncImage<Content: View>: View {
                     }
                 }
             }
+            .task {
+                // Avoid extra decoding on focus changes; let AsyncImage manage download and decoding.
+            }
         }
     }
-    
+}
     private struct CacheActionView: View {
         let url: URL
         let image: Image
@@ -953,12 +973,12 @@ struct CachedAsyncImage<Content: View>: View {
             }
         }
     }
-}
 
-class ImageCache {
+final class ImageCache {
     static let shared = ImageCache()
     private let cache = NSCache<NSURL, UIImage>()
     private init() {}
+
     func get(forKey key: URL) -> UIImage? { cache.object(forKey: key as NSURL) }
     func set(forKey key: URL, image: UIImage) { cache.setObject(image, forKey: key as NSURL) }
 }
@@ -986,3 +1006,4 @@ extension View {
         self.modifier(FocusChangeModifier(onFocusChange: action))
     }
 }
+
