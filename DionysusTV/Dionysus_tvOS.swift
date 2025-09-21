@@ -498,6 +498,15 @@ struct SourcesView: View {
         ZStack {
             ScrollView {
                 VStack(spacing: 30) {
+                    HStack {
+                        Button {
+                            Task { await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: true) }
+                        } label: {
+                            Label("Refresh", systemImage: "arrow.clockwise")
+                        }
+                        .buttonStyle(.card)
+                        Spacer()
+                    }
                     VStack(spacing: 30) {
                         Picker("Quality", selection: $selectedQuality) { ForEach(qualityOptions, id: \.self) { Text($0) } }.pickerStyle(.segmented)
                         Picker("Audio/Video", selection: $selectedAVQuality) {
@@ -528,15 +537,6 @@ struct SourcesView: View {
                 .padding(60)
             }
             .navigationTitle("Sources for \(searchQuery)")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        Task { await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: true) }
-                    } label: {
-                        Label("", systemImage: "arrow.clockwise")
-                    }
-                }
-            }
             .task { await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: false) }
             .onChange(of: selectedAVQuality) { Task { await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: false) } }
             

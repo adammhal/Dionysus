@@ -162,20 +162,19 @@ enum Tab: String, CaseIterable {
 }
 
 struct ContentView: View {
-    @State private var selectedTab: Tab = .home
-    @State private var searchViewID = UUID()
     @StateObject private var homeViewModel = HomeViewModel()
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            Group {
-                switch selectedTab {
-                case .home: HomeView(viewModel: homeViewModel)
-                case .search: SearchView().id(searchViewID)
+        TabView {
+            HomeView(viewModel: homeViewModel)
+                .tabItem {
+                    Label("Home", systemImage: "house")
                 }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            CustomTabBar(selectedTab: $selectedTab, searchViewID: $searchViewID)
+
+            SearchView()
+                .tabItem {
+                    Label("Search", systemImage: "magnifyingglass")
+                }
         }
         .preferredColorScheme(.dark)
     }
@@ -207,6 +206,7 @@ struct HomeView: View {
                     }
                     .refreshable { await viewModel.loadAllContent() }
                     .toolbar { ToolbarItem(placement: .principal) { DionysusTitleView() } }
+                    .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
                     .navigationDestination(for: MediaItem.self) { item in
                         MediaDetailView(media: item.underlyingMedia, showCustomDismissButton: true)
                     }
@@ -316,6 +316,7 @@ struct SearchView: View {
             .navigationTitle("Search")
             .searchable(text: $viewModel.query, prompt: "Search movies & TV shows...")
             .onChange(of: viewModel.query) { Task { await viewModel.performSearch() } }
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
             .navigationDestination(for: Genre.self) { genre in GenreResultsView(genre: genre) }
             .navigationDestination(for: MediaItem.self) { item in
                 MediaDetailView(media: item.underlyingMedia, showCustomDismissButton: false)
@@ -468,47 +469,6 @@ struct BlobBackgroundView: View {
     }
 }
 
-struct CustomTabBar: View {
-    @Binding var selectedTab: Tab
-    @Binding var searchViewID: UUID
-
-    var body: some View {
-        HStack {
-            ForEach(Tab.allCases, id: \.rawValue) { tab in
-                Spacer()
-                TabItemView(tab: tab, isSelected: selectedTab == tab) {
-                    if selectedTab == tab && tab == .search {
-                        searchViewID = UUID()
-                    } else {
-                        withAnimation(.interpolatingSpring(stiffness: 300, damping: 15)) { selectedTab = tab }
-                    }
-                }
-                Spacer()
-            }
-        }
-        .frame(height: 40).padding(.vertical, 12).background(.ultraThinMaterial)
-        .cornerRadius(40).shadow(radius: 10).padding(.horizontal).padding(.bottom, 10)
-    }
-}
-
-struct TabItemView: View {
-    let tab: Tab
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        VStack(spacing: 4) {
-            Image(systemName: tab.rawValue)
-                .font(.title2).symbolVariant(isSelected ? .fill : .none)
-                .scaleEffect(isSelected ? 1.2 : 1.0)
-        }
-        .foregroundColor(.white)
-        .onTapGesture {
-            HapticManager.shared.impact()
-            action()
-        }
-    }
-}
 
 struct DionysusTitleView: View {
     var body: some View {
