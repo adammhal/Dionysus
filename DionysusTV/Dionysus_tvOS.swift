@@ -499,10 +499,10 @@ struct SourcesView: View {
             ScrollView {
                 VStack(spacing: 30) {
                     HStack {
-                        Button {
+                        Button(action: {
                             Task { await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: true) }
-                        } label: {
-                            Label("Refresh", systemImage: "arrow.clockwise")
+                        }) {
+                            Image(systemName: "arrow.clockwise")
                         }
                         .buttonStyle(.card)
                         Spacer()
