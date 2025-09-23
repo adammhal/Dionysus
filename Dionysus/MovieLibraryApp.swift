@@ -1,5 +1,7 @@
 import SwiftUI
+import UIKit
 import CoreHaptics
+import PencilKit // Import PencilKit for Apple Pencil haptics support
 
 @main
 struct DionysusApp: App {
@@ -9,6 +11,8 @@ struct DionysusApp: App {
         }
     }
 }
+
+// MARK: - ViewModels
 
 @MainActor
 class HomeViewModel: ObservableObject {
@@ -23,8 +27,7 @@ class HomeViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         do {
-            try? await Task.sleep(for: .seconds(1.5))
-            
+            // Removed the artificial 1.5-second delay to improve startup time.
             async let trendingMoviesFetch = APIService.shared.fetchMovies(from: "/trending/movie/week")
             async let popularMoviesFetch = APIService.shared.fetchMovies(from: "/movie/popular")
             async let trendingShowsFetch = APIService.shared.fetchTVShows(from: "/trending/tv/week")
@@ -156,10 +159,7 @@ class GenreViewModel: ObservableObject {
     }
 }
 
-enum Tab: String, CaseIterable {
-    case home = "house"
-    case search = "magnifyingglass"
-}
+// MARK: - Main Content Views
 
 struct ContentView: View {
     @StateObject private var homeViewModel = HomeViewModel()
@@ -204,6 +204,7 @@ struct HomeView: View {
                         }
                         .padding(.vertical).padding(.bottom, 80)
                     }
+                    .sensoryFeedback(.increase, trigger: viewModel.trendingMovies.first?.id)
                     .refreshable { await viewModel.loadAllContent() }
                     .toolbar { ToolbarItem(placement: .principal) { DionysusTitleView() } }
                     .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
@@ -245,8 +246,7 @@ struct MediaCarouselView: View {
                                 }
                             }, perform: {})
                             .onChange(of: isCentered) {
-                                if isCentered && centeredItemID != item.id {
-                                    HapticManager.shared.playScrollTick()
+                                if isCentered {
                                     centeredItemID = item.id
                                 }
                             }
@@ -256,13 +256,23 @@ struct MediaCarouselView: View {
                 }
                 .padding(.horizontal)
             }
+            .sensoryFeedback(.selection, trigger: centeredItemID)
         }
     }
 }
 
+// MARK: - iPad Optimized Search View
+
 struct SearchView: View {
     @StateObject private var viewModel = SearchViewModel()
+    @State private var selectedMediaItem: MediaItem?
     
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    private var isSplitView: Bool {
+        horizontalSizeClass == .regular
+    }
+
     private let genres: [(genre: Genre, colors: [Color])] = [
         (Genre(id: 28, name: "Action"), [.blue, .purple]), (Genre(id: 12, name: "Adventure"), [.green, .blue]),
         (Genre(id: 16, name: "Animation"), [.orange, .red]), (Genre(id: 35, name: "Comedy"), [.yellow, .orange]),
@@ -276,54 +286,95 @@ struct SearchView: View {
     ]
     
     var body: some View {
-        NavigationStack {
-            Group {
-                if viewModel.query.isEmpty {
-                    ScrollView {
-                        LazyVGrid(columns: [GridItem(.flexible())], spacing: 15) {
-                            ForEach(genres, id: \.genre) { item in
-                                NavigationLink(value: item.genre) { GenreButtonView(genre: item.genre, gradient: item.colors) }
-                            }
+        if isSplitView {
+            NavigationSplitView {
+                // By wrapping the sidebar in its own NavigationStack, we create an unambiguous
+                // context for push navigation that is separate from the split view's master-detail behavior.
+                NavigationStack {
+                    sidebarView
+                        .navigationDestination(for: Genre.self) { genre in
+                            GenreResultsView(genre: genre)
                         }
-                        .padding().padding(.bottom, 80)
-                    }
-                } else {
-                    if viewModel.isLoading { ProgressView() }
-                    else if let errorMessage = viewModel.errorMessage { Text(errorMessage) }
-                    else if viewModel.searchResults.isEmpty { ContentUnavailableView.search(text: viewModel.query) }
-                    else {
-                        List(viewModel.searchResults) { item in
-                            NavigationLink(value: item) {
-                                SearchResultRow(media: item.underlyingMedia)
-                                    .onDrag {
-                                        HapticManager.shared.playDragStart()
-                                        let media = item.underlyingMedia
-                                        let path = media is Movie ? "movie" : "tv"
-                                        if let url = URL(string: "https://www.themoviedb.org/\(path)/\(media.id)") {
-                                            return NSItemProvider(object: url as NSURL)
-                                        }
-                                        return NSItemProvider()
-                                    } preview: {
-                                        MediaPosterView(media: item.underlyingMedia)
-                                            .frame(width: 150, height: 225)
-                                    }
-                            }
+                        // This destination now correctly handles pushes from within the sidebar's stack,
+                        // such as navigating from GenreResultsView to MediaDetailView.
+                        .navigationDestination(for: MediaItem.self) { item in
+                            MediaDetailView(media: item.underlyingMedia, showCustomDismissButton: true)
                         }
-                        .listStyle(.plain).padding(.bottom, 80)
-                    }
                 }
+            } detail: {
+                detailView
             }
-            .navigationTitle("Search")
-            .searchable(text: $viewModel.query, prompt: "Search movies & TV shows...")
-            .onChange(of: viewModel.query) { Task { await viewModel.performSearch() } }
-            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
-            .navigationDestination(for: Genre.self) { genre in GenreResultsView(genre: genre) }
-            .navigationDestination(for: MediaItem.self) { item in
-                MediaDetailView(media: item.underlyingMedia, showCustomDismissButton: false)
+            .navigationSplitViewStyle(.automatic)
+        } else {
+            NavigationStack {
+                sidebarView
+                    .navigationDestination(for: Genre.self) { genre in GenreResultsView(genre: genre) }
+                    .navigationDestination(for: MediaItem.self) { item in
+                        MediaDetailView(media: item.underlyingMedia, showCustomDismissButton: false)
+                    }
             }
         }
     }
+
+    @ViewBuilder
+    private var sidebarView: some View {
+        Group {
+            if viewModel.query.isEmpty {
+                ScrollView {
+                    LazyVGrid(columns: [GridItem(.flexible())], spacing: 15) {
+                        ForEach(genres, id: \.genre) { item in
+                            NavigationLink(value: item.genre) { GenreButtonView(genre: item.genre, gradient: item.colors) }
+                        }
+                    }
+                    .padding().padding(.bottom, 80)
+                }
+            } else {
+                if viewModel.isLoading { ProgressView() }
+                else if let errorMessage = viewModel.errorMessage { Text(errorMessage) }
+                else if viewModel.searchResults.isEmpty { ContentUnavailableView.search(text: viewModel.query) }
+                else {
+                    // The NavigationLink here correctly updates the `selectedMediaItem` to drive the detail view,
+                    // as it's not ambiguous anymore thanks to the explicit NavigationStack.
+                    List(viewModel.searchResults, selection: $selectedMediaItem) { item in
+                        NavigationLink(value: item) {
+                            SearchResultRow(media: item.underlyingMedia)
+                                .onDrag {
+                                    HapticManager.shared.playDragStart()
+                                    let media = item.underlyingMedia
+                                    let path = media is Movie ? "movie" : "tv"
+                                    if let url = URL(string: "https://www.themoviedb.org/\(path)/\(media.id)") {
+                                        return NSItemProvider(object: url as NSURL)
+                                    }
+                                    return NSItemProvider()
+                                } preview: {
+                                    MediaPosterView(media: item.underlyingMedia)
+                                        .frame(width: 150, height: 225)
+                                }
+                                .sensoryFeedback(.impact(weight: .light), trigger: selectedMediaItem)
+                        }
+                    }
+                    .listStyle(.plain).padding(.bottom, 80)
+                }
+            }
+        }
+        .navigationTitle("Search")
+        .searchable(text: $viewModel.query, prompt: "Search movies & TV shows...")
+        .onChange(of: viewModel.query) { Task { await viewModel.performSearch() } }
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+    }
+
+    @ViewBuilder
+    private var detailView: some View {
+        if let selectedMediaItem {
+            MediaDetailView(media: selectedMediaItem.underlyingMedia, showCustomDismissButton: false)
+        } else {
+            ContentUnavailableView("Select an item to view details", systemImage: "film")
+        }
+    }
 }
+
+
+// MARK: - iPad Optimized Detail View
 
 struct MediaDetailView: View {
     let media: any Media
@@ -334,52 +385,66 @@ struct MediaDetailView: View {
     @State private var librarySearchQuery: String?
     @State private var themeColors: [Color] = []
     @Environment(\.dismiss) private var dismiss
-    
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     private var releaseYear: String {
         (media.releaseDate?.split(separator: "-").first).map(String.init) ?? "N/A"
     }
+    
+    private var searchQuery: String {
+        (media is TVShow) ? "\(media.title) complete" : "\(media.title) \(releaseYear)"
+    }
 
     var body: some View {
-        ZStack {
-            if themeColors.isEmpty {
-                Color.black.ignoresSafeArea()
+        Group {
+            if horizontalSizeClass == .regular {
+                iPadDetailLayout
             } else {
+                iPhoneDetailLayout
+            }
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                withAnimation(.easeIn) { showContent = true }
+            }
+        }
+        .task {
+            async let colorTask: () = fetchAndSetThemeColors()
+            async let videoTask: () = fetchVideos()
+            _ = await (colorTask, videoTask)
+        }
+    }
+    
+    private var iPadDetailLayout: some View {
+        HStack(alignment: .top, spacing: 0) {
+            mainDetailContent
+                .frame(maxWidth: .infinity)
+
+            SourcesView(searchQuery: searchQuery)
+                .frame(maxWidth: 450)
+                .background(.black.opacity(0.2))
+        }
+        .background(
+            ZStack {
+                if themeColors.isEmpty { Color.black.ignoresSafeArea() }
+                else {
+                    BlobBackgroundView(colors: themeColors, isAnimating: true)
+                        .ignoresSafeArea()
+                        .transition(.opacity.animation(.easeInOut))
+                }
+            }
+        )
+    }
+
+    private var iPhoneDetailLayout: some View {
+        ZStack {
+            if themeColors.isEmpty { Color.black.ignoresSafeArea() }
+            else {
                 BlobBackgroundView(colors: themeColors, isAnimating: true)
                     .ignoresSafeArea()
                     .transition(.opacity.animation(.easeInOut))
             }
-
-            ScrollView {
-                GeometryReader { geo in
-                    let scrollY = geo.frame(in: .named("detailScroll")).minY
-                    CachedAsyncImage(url: media.backdropPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w1280\($0)") }) { phase in
-                        switch phase {
-                        case .empty: ProgressView()
-                        case .success(let image): image.resizable().aspectRatio(contentMode: .fill)
-                        default: EmptyView()
-                        }
-                    }
-                    .offset(y: scrollY > 0 ? -scrollY : 0)
-                    .scaleEffect(scrollY > 0 ? (scrollY / 1000) + 1 : 1, anchor: .bottom)
-                }
-                .frame(height: 300)
-                
-                VStack(alignment: .leading, spacing: 0) {
-                    HeaderView(media: media, releaseYear: releaseYear)
-                        .padding(.top, -50).padding(.bottom, 15)
-                    ActionButtonsView(trailerURL: trailerURL) {
-                        librarySearchQuery = (media is TVShow) ? "\(media.title) complete" : "\(media.title) \(releaseYear)"
-                    }
-                    if let show = media as? TVShow {
-                        TVShowDetailContentView(show: show, themeColor: themeColors.first)
-                    }
-                    OverviewView(overview: media.overview)
-                }
-                .padding(.bottom, 120).opacity(showContent ? 1 : 0)
-            }
-            .coordinateSpace(name: "detailScroll")
-            .background(Color.clear)
-            .ignoresSafeArea()
+            mainDetailContent
         }
         .overlay(alignment: .topLeading) {
             if showCustomDismissButton {
@@ -392,54 +457,150 @@ struct MediaDetailView: View {
             }
         }
         .sheet(item: $librarySearchQuery) { query in
-            LibraryActionSheetView(searchQuery: query).presentationDetents([.medium, .large])
+            SourcesView(searchQuery: query).presentationDetents([.medium, .large])
         }
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                withAnimation(.easeIn) { showContent = true }
-            }
-        }
-        .task {
-            async let colorTask: () = fetchAndSetThemeColors()
-            async let videoTask: () = fetchVideos()
-            _ = await (colorTask, videoTask)
-        }
-        #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
         .statusBar(hidden: true)
-        #endif
+    }
+
+    private var mainDetailContent: some View {
+        ScrollView {
+            GeometryReader { geo in
+                let scrollY = geo.frame(in: .named("detailScroll")).minY
+                CachedAsyncImage(url: media.backdropPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w1280\($0)") }) { phase in
+                    switch phase {
+                    case .empty: ProgressView()
+                    case .success(let image): image.resizable().aspectRatio(contentMode: .fill)
+                    default: EmptyView()
+                    }
+                }
+                .offset(y: scrollY > 0 ? -scrollY : 0)
+                .scaleEffect(scrollY > 0 ? (scrollY / 1000) + 1 : 1, anchor: .bottom)
+            }
+            .frame(height: 300)
+            
+            VStack(alignment: .leading, spacing: 0) {
+                HeaderView(media: media, releaseYear: releaseYear)
+                    .padding(.top, -50).padding(.bottom, 15)
+                
+                if horizontalSizeClass != .regular {
+                    ActionButtonsView(trailerURL: trailerURL) {
+                        librarySearchQuery = searchQuery
+                    }
+                } else if let trailerURL {
+                     Link(destination: trailerURL) { Label("Play Trailer", systemImage: "play.circle.fill") }
+                        .buttonStyle(.bordered)
+                        .padding()
+                }
+
+                if let show = media as? TVShow {
+                    TVShowDetailContentView(show: show, themeColor: themeColors.first)
+                }
+                OverviewView(overview: media.overview)
+            }
+            .padding(.bottom, 120).opacity(showContent ? 1 : 0)
+        }
+        .coordinateSpace(name: "detailScroll")
+        .background(Color.clear)
+        .ignoresSafeArea(edges: horizontalSizeClass == .regular ? [] : .all)
     }
     
     private func fetchVideos() async {
         do {
             let videos = try await APIService.shared.fetchVideos(for: media)
             self.trailerURL = videos.first?.youtubeURL
-        } catch {
-            
-        }
+        } catch { }
     }
     
     private func fetchAndSetThemeColors() async {
-        guard let posterPath = media.posterPath, let url = URL(string: "https://image.tmdb.org/t/p/w500\(posterPath)") else {
-            return
-        }
+        guard let posterPath = media.posterPath, let url = URL(string: "https://image.tmdb.org/t/p/w500\(posterPath)") else { return }
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             guard let image = UIImage(data: data) else { return }
-            
             let primaryUIColors = ColorExtractor.extractPrimaryColors(from: image)
             let newColors = primaryUIColors.map { Color($0).darker(by: 0.6) }
-            
-            await MainActor.run {
-                withAnimation {
-                    self.themeColors = newColors
+            await MainActor.run { withAnimation { self.themeColors = newColors } }
+        } catch { }
+    }
+}
+
+// MARK: - Renamed SourcesView (was LibraryActionSheetView)
+
+struct SourcesView: View {
+    @StateObject private var viewModel = LibraryViewModel()
+    let searchQuery: String
+    
+    @State private var selectedQuality: String = "All"
+    @State private var selectedAVQuality: AVQuality = .normal
+    @State private var filterText: String = ""
+    
+    private let qualityOptions = ["All", "2160p", "1080p", "720p"]
+    
+    private var finalSearchQuery: String {
+        var query = searchQuery
+        if let term = selectedAVQuality.queryTerm {
+            query += " \(term)"
+        }
+        return query
+    }
+    
+    private var providerOptions: [String] { ["All"] + Set(viewModel.torrents.compactMap { $0.provider }).sorted() }
+    
+    private var filteredTorrents: [Torrent] {
+        var torrents = viewModel.torrents
+        if selectedQuality != "All" { torrents = torrents.filter { $0.quality == selectedQuality } }
+        if !filterText.isEmpty { torrents = torrents.filter { $0.name.localizedCaseInsensitiveContains(filterText) } }
+        return torrents
+    }
+    
+    var body: some View {
+        ZStack {
+            // Removed the nested NavigationStack to prevent conflicts with NavigationSplitView.
+            VStack {
+                VStack {
+                    Picker("Quality", selection: $selectedQuality) { ForEach(qualityOptions, id: \.self) { Text($0) } }.pickerStyle(.segmented)
+                    Picker("Audio/Video", selection: $selectedAVQuality) {
+                        ForEach(AVQuality.allCases) { quality in Text(quality.rawValue).tag(quality) }
+                    }
+                    .pickerStyle(.segmented)
+                    TextField("Filter by name...", text: $filterText)
+                        .font(.custom("Eurostile-Regular", size: 16))
+                        .padding(8)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(10)
+                }
+                .padding(.horizontal)
+
+                Group {
+                    if viewModel.isLoading { ProgressView() }
+                    else if let errorMessage = viewModel.errorMessage { ErrorView(message: errorMessage) { Task { await viewModel.fetchTorrents(for: finalSearchQuery) } } }
+                    else if filteredTorrents.isEmpty { ContentUnavailableView("No Sources Found", systemImage: "magnifyingglass") }
+                    else {
+                        List(filteredTorrents) { torrent in
+                            let isAdded = torrent.infoHash.flatMap { viewModel.existingTorrentHashes.contains($0) } ?? false
+                            TorrentRowView(torrent: torrent, isAlreadyAdded: isAdded) { magnet in Task { await viewModel.addTorrent(magnet: magnet) } }
+                        }
+                        .listStyle(.plain)
+                    }
                 }
             }
-        } catch {
-            
+            .navigationTitle("Sources")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button { Task { await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: true) } } label: { Label("Refresh", systemImage: "arrow.clockwise") }
+                }
+            }
+            .task(id: finalSearchQuery) { await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: false) }
+            .onChange(of: viewModel.addState) { if viewModel.addState == .success {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { viewModel.addState = .idle }
+            }}
+            if viewModel.addState != .idle { StatusOverlayView(addState: $viewModel.addState) }
         }
     }
 }
+
+// MARK: - Reusable UI Components
 
 struct BlobBackgroundView: View {
     @State var animate = false
@@ -593,97 +754,9 @@ enum AVQuality: String, CaseIterable, Identifiable {
     
     var queryTerm: String? {
         switch self {
-        case .normal:
-            return nil
-        case .dolbyVision:
-            return "vision"
-        case .dolbyAtmos:
-            return "atmos"
-        }
-    }
-}
-
-struct LibraryActionSheetView: View {
-    @StateObject private var viewModel = LibraryViewModel()
-    let searchQuery: String
-    @Environment(\.dismiss) private var dismiss
-    
-    @State private var selectedQuality: String = "All"
-    @State private var selectedAVQuality: AVQuality = .normal
-    @State private var filterText: String = ""
-    
-    private let qualityOptions = ["All", "2160p", "1080p", "720p"]
-    
-    private var finalSearchQuery: String {
-        var query = searchQuery
-        if let term = selectedAVQuality.queryTerm {
-            query += " \(term)"
-        }
-        return query
-    }
-    
-    private var providerOptions: [String] { ["All"] + Set(viewModel.torrents.compactMap { $0.provider }).sorted() }
-    
-    private var filteredTorrents: [Torrent] {
-        var torrents = viewModel.torrents
-        if selectedQuality != "All" { torrents = torrents.filter { $0.quality == selectedQuality } }
-        if !filterText.isEmpty { torrents = torrents.filter { $0.name.localizedCaseInsensitiveContains(filterText) } }
-        return torrents
-    }
-    
-    var body: some View {
-        ZStack {
-            NavigationView {
-                VStack {
-                    VStack {
-                        Picker("Quality", selection: $selectedQuality) { ForEach(qualityOptions, id: \.self) { Text($0) } }.pickerStyle(.segmented)
-                        
-                        Picker("Audio/Video", selection: $selectedAVQuality) {
-                            ForEach(AVQuality.allCases) { quality in
-                                Text(quality.rawValue).tag(quality)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        
-                        TextField("Filter by name...", text: $filterText)
-                            .font(.custom("Eurostile-Regular", size: 16))
-                            .padding(8)
-                            .background(Color(.systemGray5))
-                            .cornerRadius(10)
-                    }
-                    .padding(.horizontal)
-
-                    Group {
-                        if viewModel.isLoading { ProgressView() }
-                        else if let errorMessage = viewModel.errorMessage { ErrorView(message: errorMessage) { Task { await viewModel.fetchTorrents(for: finalSearchQuery) } } }
-                        else if filteredTorrents.isEmpty { ContentUnavailableView("No Sources Found", systemImage: "magnifyingglass") }
-                        else {
-                            List(filteredTorrents) { torrent in
-                                let isAdded = torrent.infoHash.flatMap { viewModel.existingTorrentHashes.contains($0) } ?? false
-                                TorrentRowView(torrent: torrent, isAlreadyAdded: isAdded) { magnet in Task { await viewModel.addTorrent(magnet: magnet) } }
-                            }
-                        }
-                    }
-                }
-                .navigationTitle("Sources for \(searchQuery)")
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button {
-                            Task {
-                                await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: true)
-                            }
-                        } label: {
-                            Label("Refresh", systemImage: "arrow.clockwise")
-                        }
-                    }
-                }
-            }
-            .task { await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: false) }
-            .onChange(of: selectedAVQuality) {
-                Task { await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: false) }
-            }
-            .onChange(of: viewModel.addState) { if viewModel.addState == .success { DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { dismiss() } } }
-            if viewModel.addState != .idle { StatusOverlayView(addState: $viewModel.addState) }
+        case .normal: return nil
+        case .dolbyVision: return "vision"
+        case .dolbyAtmos: return "atmos"
         }
     }
 }
@@ -789,7 +862,7 @@ struct TVShowDetailContentView: View {
             await viewModel.fetchDetails(for: show.id)
             if let firstSeason = viewModel.showDetails?.seasons.first(where: { $0.seasonNumber > 0 }) ?? viewModel.showDetails?.seasons.first { selectedSeason = firstSeason.seasonNumber }
         }
-        .sheet(item: $librarySearchQuery) { query in LibraryActionSheetView(searchQuery: query).presentationDetents([.medium, .large]) }
+        .sheet(item: $librarySearchQuery) { query in SourcesView(searchQuery: query).presentationDetents([.medium, .large]) }
     }
 }
 
@@ -898,6 +971,8 @@ struct HomeLoadingView: View {
         .shimmering()
     }
 }
+
+// MARK: - Helpers & Extensions
 
 struct Shimmer: ViewModifier {
     @State private var phase: CGFloat = -2.0
@@ -1032,8 +1107,3 @@ extension UINavigationController: @retroactive UIGestureRecognizerDelegate {
 }
 #endif
 
-struct ContentView_Previews: PreviewProvider {
-    static var previews: some View {
-        ContentView()
-    }
-}
