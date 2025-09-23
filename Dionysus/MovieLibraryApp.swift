@@ -163,7 +163,6 @@ enum Tab: String, CaseIterable {
 
 struct ContentView: View {
     @StateObject private var homeViewModel = HomeViewModel()
-    @State private var searchQuery = ""
 
     var body: some View {
         TabView {
@@ -172,7 +171,7 @@ struct ContentView: View {
                     Label("Home", systemImage: "house")
                 }
 
-            SearchView(searchQuery: $searchQuery)
+            SearchView()
                 .tabItem {
                     Label("Search", systemImage: "magnifyingglass")
                 }
@@ -263,8 +262,7 @@ struct MediaCarouselView: View {
 
 struct SearchView: View {
     @StateObject private var viewModel = SearchViewModel()
-    @Binding var searchQuery: String
-
+    
     private let genres: [(genre: Genre, colors: [Color])] = [
         (Genre(id: 28, name: "Action"), [.blue, .purple]), (Genre(id: 12, name: "Adventure"), [.green, .blue]),
         (Genre(id: 16, name: "Animation"), [.orange, .red]), (Genre(id: 35, name: "Comedy"), [.yellow, .orange]),
@@ -280,7 +278,7 @@ struct SearchView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if searchQuery.isEmpty {
+                if viewModel.query.isEmpty {
                     ScrollView {
                         LazyVGrid(columns: [GridItem(.flexible())], spacing: 15) {
                             ForEach(genres, id: \.genre) { item in
@@ -292,7 +290,7 @@ struct SearchView: View {
                 } else {
                     if viewModel.isLoading { ProgressView() }
                     else if let errorMessage = viewModel.errorMessage { Text(errorMessage) }
-                    else if viewModel.searchResults.isEmpty { ContentUnavailableView.search(text: searchQuery) }
+                    else if viewModel.searchResults.isEmpty { ContentUnavailableView.search(text: viewModel.query) }
                     else {
                         List(viewModel.searchResults) { item in
                             NavigationLink(value: item) {
@@ -316,29 +314,13 @@ struct SearchView: View {
                 }
             }
             .navigationTitle("Search")
-            #if os(macOS)
-            .toolbar {
-                ToolbarItem {
-                    TextField("Search movies & TV shows...", text: $searchQuery)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(minWidth: 250)
-                }
-            }
-            #else
-            .searchable(text: $searchQuery, prompt: "Search movies & TV shows...")
-            #endif
-            .onChange(of: searchQuery) {
-                viewModel.query = searchQuery
-                Task { await viewModel.performSearch() }
-            }
+            .searchable(text: $viewModel.query, prompt: "Search movies & TV shows...")
+            .onChange(of: viewModel.query) { Task { await viewModel.performSearch() } }
             .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
             .navigationDestination(for: Genre.self) { genre in GenreResultsView(genre: genre) }
             .navigationDestination(for: MediaItem.self) { item in
                 MediaDetailView(media: item.underlyingMedia, showCustomDismissButton: false)
             }
-        }
-        .onAppear {
-            viewModel.query = searchQuery
         }
     }
 }
@@ -490,11 +472,8 @@ struct BlobBackgroundView: View {
 
 struct DionysusTitleView: View {
     var body: some View {
-        Image("logo3")
-            .resizable()
-            .scaledToFit()
-            .frame(height: 40)
-            .background(.clear)
+        Text("Dionysus").font(.custom("Eurostile-Regular", size: 34))
+            .foregroundStyle(LinearGradient(colors: [.purple.opacity(0.8), .blue.opacity(0.8)], startPoint: .leading, endPoint: .trailing))
     }
 }
 
