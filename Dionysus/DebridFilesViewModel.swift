@@ -6,10 +6,16 @@ class DebridFilesViewModel: ObservableObject {
     @Published var torrents: [RealDebridTorrent] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var searchText = ""
 
     private var currentPage = 1
     private var isFetching = false
     private var hasMorePages = true
+
+    var filteredTorrents: [RealDebridTorrent] {
+        guard !searchText.isEmpty else { return torrents }
+        return torrents.filter { $0.filename.localizedCaseInsensitiveContains(searchText) }
+    }
 
     func fetchTorrents(forceRefresh: Bool = false) async {
         guard !isFetching, hasMorePages || forceRefresh else { return }
