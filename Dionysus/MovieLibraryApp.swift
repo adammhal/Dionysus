@@ -175,6 +175,11 @@ struct ContentView: View {
                 .tabItem {
                     Label("Search", systemImage: "magnifyingglass")
                 }
+
+            RealDebridView()
+                .tabItem {
+                    Label("Real-Debrid", systemImage: "tray.full")
+                }
         }
         .preferredColorScheme(.dark)
     }

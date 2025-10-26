@@ -177,6 +177,11 @@ struct RealDebridTorrent: Codable, Identifiable {
     let hash: String
     let bytes: Int
     let status: String
+    let progress: Int
+    let added: String
+    let links: [String]
+    let speed: Int?
+    let seeders: Int?
 }
 
 class APIService {
@@ -308,6 +313,28 @@ class APIService {
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.httpBody = "files=all".data(using: .utf8)
         
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 204 else {
+            throw URLError(.badServerResponse)
+        }
+    }
+
+    func fetchRealDebridTorrents(page: Int, limit: Int) async throws -> [RealDebridTorrent] {
+        let url = URL(string: "https://api.real-debrid.com/rest/1.0/torrents?page=\(page)&limit=\(limit)")!
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(Secrets.realDebridApiKey)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw URLError(.badServerResponse)
+        }
+        return try JSONDecoder().decode([RealDebridTorrent].self, from: data)
+    }
+
+    func deleteRealDebridTorrent(id: String) async throws {
+        let url = URL(string: "https://api.real-debrid.com/rest/1.0/torrents/delete/\(id)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("Bearer \(Secrets.realDebridApiKey)", forHTTPHeaderField: "Authorization")
         let (_, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 204 else {
             throw URLError(.badServerResponse)
