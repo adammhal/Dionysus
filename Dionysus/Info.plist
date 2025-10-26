@@ -13,5 +13,16 @@
 		<key>UIImageName</key>
 		<string>logo3</string>
 	</dict>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>dionysus</string>
+			</array>
+			<key>CFBundleURLName</key>
+			<string>com.dionysus.auth</string>
+		</dict>
+	</array>
 </dict>
 </plist>
