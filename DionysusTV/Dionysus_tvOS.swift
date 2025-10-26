@@ -458,15 +458,20 @@ struct MediaDetailView: View {
 
 struct SourcesView: View {
     @StateObject private var viewModel = LibraryViewModel()
-    let searchQuery: String
-    
-    @State private var selectedQuality: String = "All"
-    @State private var selectedAVQuality: AVQuality = .normal
-    
-    private let qualityOptions = ["All", "2160p", "1080p", "720p"]
-    
-    private var finalSearchQuery: String {
-        var query = searchQuery
+        let searchQuery: String
+        
+        @State private var selectedQuality: String = "All"
+        @State private var selectedAVQuality: AVQuality = .normal
+        @State private var selectedProvider: String = "All"
+        
+        private let qualityOptions = ["All", "2160p", "1080p", "720p"]
+        
+        private var providerOptions: [String] {
+            ["All"] + Set(viewModel.torrents.compactMap { $0.provider }).sorted()
+        }
+        
+        private var finalSearchQuery: String {
+            var query = searchQuery
         if let term = selectedAVQuality.queryTerm {
             query += " \(term)"
         }
@@ -475,7 +480,8 @@ struct SourcesView: View {
     
     private var filteredTorrents: [Torrent] {
         let filtered = viewModel.torrents.filter {
-            (selectedQuality == "All" || $0.quality == selectedQuality)
+                (selectedQuality == "All" || $0.quality == selectedQuality) &&
+                (selectedProvider == "All" || $0.provider == selectedProvider)
         }
 
         return filtered.sorted { t1, t2 in
@@ -498,7 +504,6 @@ struct SourcesView: View {
         ZStack {
             ScrollView {
                 VStack(spacing: 30) {
-                    HStack {
                         Button(action: {
                             Task { await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: true) }
                         }) {
@@ -506,12 +511,19 @@ struct SourcesView: View {
                         }
                         .buttonStyle(.card)
                         Spacer()
-                    }
                     VStack(spacing: 30) {
                         Picker("Quality", selection: $selectedQuality) { ForEach(qualityOptions, id: \.self) { Text($0) } }.pickerStyle(.segmented)
                         Picker("Audio/Video", selection: $selectedAVQuality) {
                             ForEach(AVQuality.allCases) { Text($0.rawValue).tag($0) }
                         }.pickerStyle(.segmented)
+                        if providerOptions.count > 1 {
+                            Picker("Provider", selection: $selectedProvider) {
+                                ForEach(providerOptions, id: \.self) {
+                                    Text($0)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                        }
                     }
                     .focusSection()
 

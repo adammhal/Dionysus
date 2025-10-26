@@ -335,25 +335,54 @@ struct SearchView: View {
                 else {
                     // The NavigationLink here correctly updates the `selectedMediaItem` to drive the detail view,
                     // as it's not ambiguous anymore thanks to the explicit NavigationStack.
-                    List(viewModel.searchResults, selection: $selectedMediaItem) { item in
-                        NavigationLink(value: item) {
-                            SearchResultRow(media: item.underlyingMedia)
-                                .onDrag {
-                                    HapticManager.shared.playDragStart()
-                                    let media = item.underlyingMedia
-                                    let path = media is Movie ? "movie" : "tv"
-                                    if let url = URL(string: "https://www.themoviedb.org/\(path)/\(media.id)") {
-                                        return NSItemProvider(object: url as NSURL)
+                    if isSplitView {
+                        // For iPad: Keep the selection binding to drive the detail view.
+                        List(viewModel.searchResults, selection: $selectedMediaItem) { item in
+                            NavigationLink(value: item) {
+                                SearchResultRow(media: item.underlyingMedia)
+                                    .onDrag {
+                                        HapticManager.shared.playDragStart()
+                                        let media = item.underlyingMedia
+                                        let path = media is Movie ? "movie" : "tv"
+                                        if let url = URL(string: "https://www.themoviedb.org/\(path)/\(media.id)") {
+                                            return NSItemProvider(object: url as NSURL)
+                                        }
+                                        return NSItemProvider()
+                                    } preview: {
+                                        MediaPosterView(media: item.underlyingMedia)
+                                            .frame(width: 150, height: 225)
                                     }
-                                    return NSItemProvider()
-                                } preview: {
-                                    MediaPosterView(media: item.underlyingMedia)
-                                        .frame(width: 150, height: 225)
-                                }
-                                .sensoryFeedback(.impact(weight: .light), trigger: selectedMediaItem)
+                                    .sensoryFeedback(.impact(weight: .light), trigger: selectedMediaItem)
+                            }
                         }
+                        .listStyle(.plain)
+                        .padding(.bottom, 80)
+                    } else {
+                        // For iPhone: Remove the selection binding to allow push navigation.
+                        List(viewModel.searchResults) { item in // No selection parameter here
+                            NavigationLink(value: item) {
+                                SearchResultRow(media: item.underlyingMedia)
+                                    .onDrag {
+                                        HapticManager.shared.playDragStart()
+                                        let media = item.underlyingMedia
+                                        let path = media is Movie ? "movie" : "tv"
+                                        if let url = URL(string: "https://www.themoviedb.org/\(path)/\(media.id)") {
+                                            return NSItemProvider(object: url as NSURL)
+                                        }
+                                        return NSItemProvider()
+                                    } preview: {
+                                        MediaPosterView(media: item.underlyingMedia)
+                                            .frame(width: 150, height: 225)
+                                    }
+                                    // Note: The sensory feedback trigger won't activate here since
+                                    // selectedMediaItem is not used in the iPhone layout, but
+                                    // it doesn't harm anything to leave it.
+                                    .sensoryFeedback(.impact(weight: .light), trigger: selectedMediaItem)
+                            }
+                        }
+                        .listStyle(.plain)
+                        .padding(.bottom, 80)
                     }
-                    .listStyle(.plain).padding(.bottom, 80)
                 }
             }
         }
@@ -457,7 +486,9 @@ struct MediaDetailView: View {
             }
         }
         .sheet(item: $librarySearchQuery) { query in
-            SourcesView(searchQuery: query).presentationDetents([.medium, .large])
+            NavigationStack {
+                SourcesView(searchQuery: query)
+            }.presentationDetents([.medium, .large])
         }
         .toolbar(.hidden, for: .navigationBar)
         .statusBar(hidden: true)
@@ -533,6 +564,7 @@ struct SourcesView: View {
     @State private var selectedQuality: String = "All"
     @State private var selectedAVQuality: AVQuality = .normal
     @State private var filterText: String = ""
+    @State private var selectedProvider: String = "All"
     
     private let qualityOptions = ["All", "2160p", "1080p", "720p"]
     
@@ -547,18 +579,19 @@ struct SourcesView: View {
     private var providerOptions: [String] { ["All"] + Set(viewModel.torrents.compactMap { $0.provider }).sorted() }
     
     private var filteredTorrents: [Torrent] {
-        var torrents = viewModel.torrents
+        var torrents = viewModel.torrents.filter { $0.magnet != nil }
         if selectedQuality != "All" { torrents = torrents.filter { $0.quality == selectedQuality } }
+        if selectedProvider != "All" { torrents = torrents.filter { $0.provider == selectedProvider } }
         if !filterText.isEmpty { torrents = torrents.filter { $0.name.localizedCaseInsensitiveContains(filterText) } }
         return torrents
     }
-    
     var body: some View {
         ZStack {
             // Removed the nested NavigationStack to prevent conflicts with NavigationSplitView.
             VStack {
                 VStack {
                     Picker("Quality", selection: $selectedQuality) { ForEach(qualityOptions, id: \.self) { Text($0) } }.pickerStyle(.segmented)
+                        .padding(.top, 5)
                     Picker("Audio/Video", selection: $selectedAVQuality) {
                         ForEach(AVQuality.allCases) { quality in Text(quality.rawValue).tag(quality) }
                     }
@@ -570,6 +603,7 @@ struct SourcesView: View {
                         .cornerRadius(10)
                 }
                 .padding(.horizontal)
+                .padding(.top)
 
                 Group {
                     if viewModel.isLoading { ProgressView() }
@@ -586,7 +620,17 @@ struct SourcesView: View {
             }
             .navigationTitle("Sources")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
+            .toolbar {ToolbarItem(placement: .navigationBarLeading) {
+                Menu {
+                    Picker("Provider", selection: $selectedProvider) {
+                        ForEach(providerOptions, id: \.self) { provider in
+                            Text(provider).tag(provider)
+                        }
+                    }
+                } label: {
+                    Label("Filter Providers", systemImage: "line.3.horizontal.decrease.circle")
+                }
+            }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { Task { await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: true) } } label: { Label("Refresh", systemImage: "arrow.clockwise") }
                 }
@@ -785,7 +829,7 @@ struct TorrentRowView: View {
             }
             .padding(.vertical, 6)
         }
-        .disabled(torrent.magnet == nil || isAlreadyAdded)
+        .disabled(isAlreadyAdded)
     }
 }
 
@@ -862,7 +906,11 @@ struct TVShowDetailContentView: View {
             await viewModel.fetchDetails(for: show.id)
             if let firstSeason = viewModel.showDetails?.seasons.first(where: { $0.seasonNumber > 0 }) ?? viewModel.showDetails?.seasons.first { selectedSeason = firstSeason.seasonNumber }
         }
-        .sheet(item: $librarySearchQuery) { query in SourcesView(searchQuery: query).presentationDetents([.medium, .large]) }
+        .sheet(item: $librarySearchQuery) { query in
+            NavigationStack {
+                    SourcesView(searchQuery: query)
+                }
+            .presentationDetents([.medium, .large]) }
     }
 }
 

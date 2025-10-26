@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		F01AD5102E81D02A0047AC87 /* DionysusWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = F01AD5062E81D0290047AC87 /* DionysusWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		F0504BE22E8440D700B6A4F4 /* ColorThiefSwift in Frameworks */ = {isa = PBXBuildFile; productRef = F0504BE12E8440D700B6A4F4 /* ColorThiefSwift */; };
 		F082400C2E3BE68E0070A0C2 /* TVServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F082400B2E3BE68E0070A0C2 /* TVServices.framework */; };
 		F08240132E3BE68E0070A0C2 /* DionysusTopShelf.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F08240092E3BE68D0070A0C2 /* DionysusTopShelf.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		F082401C2E3BF3670070A0C2 /* ColorThiefSwift in Frameworks */ = {isa = PBXBuildFile; productRef = F082401B2E3BF3670070A0C2 /* ColorThiefSwift */; };
@@ -22,20 +23,6 @@
 			proxyType = 1;
 			remoteGlobalIDString = F01AD5052E81D0290047AC87;
 			remoteInfo = "DionysusWatch Watch App";
-		};
-		F03CA0D62E81CCF8003F6558 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = F085E5372E32EB8F00C84043 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = F03CA0C62E81CCF7003F6558;
-			remoteInfo = DionysusMac;
-		};
-		F03CA0E02E81CCF8003F6558 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = F085E5372E32EB8F00C84043 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = F03CA0C62E81CCF7003F6558;
-			remoteInfo = DionysusMac;
 		};
 		F08240112E3BE68E0070A0C2 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -107,9 +94,6 @@
 		F01AD4ED2E81CE030047AC87 /* DionysusWatch_Watch_AppUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DionysusWatch_Watch_AppUITests.swift; sourceTree = "<group>"; };
 		F01AD4EE2E81CE030047AC87 /* DionysusWatch_Watch_AppUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DionysusWatch_Watch_AppUITestsLaunchTests.swift; sourceTree = "<group>"; };
 		F01AD5062E81D0290047AC87 /* DionysusWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "DionysusWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		F03CA0C72E81CCF7003F6558 /* DionysusMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DionysusMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		F03CA0D52E81CCF8003F6558 /* DionysusMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DionysusMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		F03CA0DF2E81CCF8003F6558 /* DionysusMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DionysusMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F08240092E3BE68D0070A0C2 /* DionysusTopShelf.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DionysusTopShelf.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		F082400B2E3BE68E0070A0C2 /* TVServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = TVServices.framework; path = Library/Frameworks/TVServices.framework; sourceTree = DEVELOPER_DIR; };
 		F085E53F2E32EB8F00C84043 /* Dionysus.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Dionysus.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -121,14 +105,6 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		F01AD5162E822A910047AC87 /* Exceptions for "Dionysus" folder in "DionysusMac" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Secrets.swift,
-				SharedCode.swift,
-			);
-			target = F03CA0C62E81CCF7003F6558 /* DionysusMac */;
-		};
 		F01AD5172E822A910047AC87 /* Exceptions for "Dionysus" folder in "DionysusWatch Watch App" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -182,11 +158,6 @@
 			path = "DionysusWatch Watch App";
 			sourceTree = "<group>";
 		};
-		F03CA0C82E81CCF7003F6558 /* DionysusMac */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = DionysusMac;
-			sourceTree = "<group>";
-		};
 		F082400D2E3BE68E0070A0C2 /* DionysusTopShelf */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -201,7 +172,6 @@
 				F085E5722E33DE7D00C84043 /* Exceptions for "Dionysus" folder in "Dionysus" target */,
 				F085E5B62E354AE200C84043 /* Exceptions for "Dionysus" folder in "DionysusTV" target */,
 				F082401A2E3BE6C30070A0C2 /* Exceptions for "Dionysus" folder in "DionysusTopShelf" target */,
-				F01AD5162E822A910047AC87 /* Exceptions for "Dionysus" folder in "DionysusMac" target */,
 				F01AD5172E822A910047AC87 /* Exceptions for "Dionysus" folder in "DionysusWatch Watch App" target */,
 			);
 			path = Dionysus;
@@ -242,27 +212,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		F03CA0C42E81CCF7003F6558 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		F03CA0D22E81CCF8003F6558 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		F03CA0DC2E81CCF8003F6558 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
+				F0504BE22E8440D700B6A4F4 /* ColorThiefSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -367,7 +317,6 @@
 				F085E55E2E32EB9000C84043 /* DionysusUITests */,
 				F085E5832E35490900C84043 /* DionysusTV */,
 				F082400D2E3BE68E0070A0C2 /* DionysusTopShelf */,
-				F03CA0C82E81CCF7003F6558 /* DionysusMac */,
 				F01AD5072E81D0290047AC87 /* DionysusWatch Watch App */,
 				F082400A2E3BE68E0070A0C2 /* Frameworks */,
 				F085E5402E32EB8F00C84043 /* Products */,
@@ -387,9 +336,6 @@
 				F085E5932E35490B00C84043 /* DionysusTVTests.xctest */,
 				F085E59D2E35490B00C84043 /* DionysusTVUITests.xctest */,
 				F08240092E3BE68D0070A0C2 /* DionysusTopShelf.appex */,
-				F03CA0C72E81CCF7003F6558 /* DionysusMac.app */,
-				F03CA0D52E81CCF8003F6558 /* DionysusMacTests.xctest */,
-				F03CA0DF2E81CCF8003F6558 /* DionysusMacUITests.xctest */,
 				F01AD5062E81D0290047AC87 /* DionysusWatch Watch App.app */,
 			);
 			name = Products;
@@ -415,72 +361,11 @@
 			);
 			name = "DionysusWatch Watch App";
 			packageProductDependencies = (
+				F0504BE12E8440D700B6A4F4 /* ColorThiefSwift */,
 			);
 			productName = "DionysusWatch Watch App";
 			productReference = F01AD5062E81D0290047AC87 /* DionysusWatch Watch App.app */;
 			productType = "com.apple.product-type.application";
-		};
-		F03CA0C62E81CCF7003F6558 /* DionysusMac */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = F03CA0ED2E81CCF8003F6558 /* Build configuration list for PBXNativeTarget "DionysusMac" */;
-			buildPhases = (
-				F03CA0C32E81CCF7003F6558 /* Sources */,
-				F03CA0C42E81CCF7003F6558 /* Frameworks */,
-				F03CA0C52E81CCF7003F6558 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				F03CA0C82E81CCF7003F6558 /* DionysusMac */,
-			);
-			name = DionysusMac;
-			packageProductDependencies = (
-			);
-			productName = DionysusMac;
-			productReference = F03CA0C72E81CCF7003F6558 /* DionysusMac.app */;
-			productType = "com.apple.product-type.application";
-		};
-		F03CA0D42E81CCF8003F6558 /* DionysusMacTests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = F03CA0EE2E81CCF8003F6558 /* Build configuration list for PBXNativeTarget "DionysusMacTests" */;
-			buildPhases = (
-				F03CA0D12E81CCF8003F6558 /* Sources */,
-				F03CA0D22E81CCF8003F6558 /* Frameworks */,
-				F03CA0D32E81CCF8003F6558 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				F03CA0D72E81CCF8003F6558 /* PBXTargetDependency */,
-			);
-			name = DionysusMacTests;
-			packageProductDependencies = (
-			);
-			productName = DionysusMacTests;
-			productReference = F03CA0D52E81CCF8003F6558 /* DionysusMacTests.xctest */;
-			productType = "com.apple.product-type.bundle.unit-test";
-		};
-		F03CA0DE2E81CCF8003F6558 /* DionysusMacUITests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = F03CA0EF2E81CCF8003F6558 /* Build configuration list for PBXNativeTarget "DionysusMacUITests" */;
-			buildPhases = (
-				F03CA0DB2E81CCF8003F6558 /* Sources */,
-				F03CA0DC2E81CCF8003F6558 /* Frameworks */,
-				F03CA0DD2E81CCF8003F6558 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				F03CA0E12E81CCF8003F6558 /* PBXTargetDependency */,
-			);
-			name = DionysusMacUITests;
-			packageProductDependencies = (
-			);
-			productName = DionysusMacUITests;
-			productReference = F03CA0DF2E81CCF8003F6558 /* DionysusMacUITests.xctest */;
-			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 		F08240082E3BE68D0070A0C2 /* DionysusTopShelf */ = {
 			isa = PBXNativeTarget;
@@ -656,17 +541,6 @@
 					F01AD5052E81D0290047AC87 = {
 						CreatedOnToolsVersion = 26.0;
 					};
-					F03CA0C62E81CCF7003F6558 = {
-						CreatedOnToolsVersion = 26.0;
-					};
-					F03CA0D42E81CCF8003F6558 = {
-						CreatedOnToolsVersion = 26.0;
-						TestTargetID = F03CA0C62E81CCF7003F6558;
-					};
-					F03CA0DE2E81CCF8003F6558 = {
-						CreatedOnToolsVersion = 26.0;
-						TestTargetID = F03CA0C62E81CCF7003F6558;
-					};
 					F08240082E3BE68D0070A0C2 = {
 						CreatedOnToolsVersion = 16.0;
 					};
@@ -718,9 +592,6 @@
 				F085E5922E35490B00C84043 /* DionysusTVTests */,
 				F085E59C2E35490B00C84043 /* DionysusTVUITests */,
 				F08240082E3BE68D0070A0C2 /* DionysusTopShelf */,
-				F03CA0C62E81CCF7003F6558 /* DionysusMac */,
-				F03CA0D42E81CCF8003F6558 /* DionysusMacTests */,
-				F03CA0DE2E81CCF8003F6558 /* DionysusMacUITests */,
 				F01AD5052E81D0290047AC87 /* DionysusWatch Watch App */,
 			);
 		};
@@ -728,27 +599,6 @@
 
 /* Begin PBXResourcesBuildPhase section */
 		F01AD5042E81D0290047AC87 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		F03CA0C52E81CCF7003F6558 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		F03CA0D32E81CCF8003F6558 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		F03CA0DD2E81CCF8003F6558 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -814,27 +664,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		F03CA0C32E81CCF7003F6558 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		F03CA0D12E81CCF8003F6558 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		F03CA0DB2E81CCF8003F6558 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		F08240052E3BE68D0070A0C2 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -891,16 +720,6 @@
 			isa = PBXTargetDependency;
 			target = F01AD5052E81D0290047AC87 /* DionysusWatch Watch App */;
 			targetProxy = F01AD50E2E81D02A0047AC87 /* PBXContainerItemProxy */;
-		};
-		F03CA0D72E81CCF8003F6558 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = F03CA0C62E81CCF7003F6558 /* DionysusMac */;
-			targetProxy = F03CA0D62E81CCF8003F6558 /* PBXContainerItemProxy */;
-		};
-		F03CA0E12E81CCF8003F6558 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = F03CA0C62E81CCF7003F6558 /* DionysusMac */;
-			targetProxy = F03CA0E02E81CCF8003F6558 /* PBXContainerItemProxy */;
 		};
 		F08240122E3BE68E0070A0C2 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -993,186 +812,6 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
 				WATCHOS_DEPLOYMENT_TARGET = 26.0;
-			};
-			name = Release;
-		};
-		F03CA0E72E81CCF8003F6558 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
-				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = BV94GNRP6Y;
-				ENABLE_APP_SANDBOX = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
-				ENABLE_PREVIEWS = YES;
-				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
-				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
-				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
-				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
-				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
-				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
-				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
-				ENABLE_RESOURCE_ACCESS_USB = NO;
-				ENABLE_USER_SELECTED_FILES = readonly;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = adammmhal.DionysusMac;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
-				SDKROOT = macosx;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-			};
-			name = Debug;
-		};
-		F03CA0E82E81CCF8003F6558 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
-				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = BV94GNRP6Y;
-				ENABLE_APP_SANDBOX = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
-				ENABLE_PREVIEWS = YES;
-				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
-				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
-				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
-				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
-				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
-				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
-				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
-				ENABLE_RESOURCE_ACCESS_USB = NO;
-				ENABLE_USER_SELECTED_FILES = readonly;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = adammmhal.DionysusMac;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
-				SDKROOT = macosx;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-			};
-			name = Release;
-		};
-		F03CA0E92E81CCF8003F6558 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = BV94GNRP6Y;
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = adammmhal.DionysusMacTests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx;
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DionysusMac.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/DionysusMac";
-			};
-			name = Debug;
-		};
-		F03CA0EA2E81CCF8003F6558 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = BV94GNRP6Y;
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = adammmhal.DionysusMacTests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx;
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DionysusMac.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/DionysusMac";
-			};
-			name = Release;
-		};
-		F03CA0EB2E81CCF8003F6558 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = BV94GNRP6Y;
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = adammmhal.DionysusMacUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx;
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = DionysusMac;
-			};
-			name = Debug;
-		};
-		F03CA0EC2E81CCF8003F6558 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = BV94GNRP6Y;
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = adammmhal.DionysusMacUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx;
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = DionysusMac;
 			};
 			name = Release;
 		};
@@ -1631,33 +1270,6 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		F03CA0ED2E81CCF8003F6558 /* Build configuration list for PBXNativeTarget "DionysusMac" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				F03CA0E72E81CCF8003F6558 /* Debug */,
-				F03CA0E82E81CCF8003F6558 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		F03CA0EE2E81CCF8003F6558 /* Build configuration list for PBXNativeTarget "DionysusMacTests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				F03CA0E92E81CCF8003F6558 /* Debug */,
-				F03CA0EA2E81CCF8003F6558 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		F03CA0EF2E81CCF8003F6558 /* Build configuration list for PBXNativeTarget "DionysusMacUITests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				F03CA0EB2E81CCF8003F6558 /* Debug */,
-				F03CA0EC2E81CCF8003F6558 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		F08240142E3BE68E0070A0C2 /* Build configuration list for PBXNativeTarget "DionysusTopShelf" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -1744,6 +1356,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		F0504BE12E8440D700B6A4F4 /* ColorThiefSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F085E5B92E35FADC00C84043 /* XCRemoteSwiftPackageReference "ColorThiefSwift" */;
+			productName = ColorThiefSwift;
+		};
 		F082401B2E3BF3670070A0C2 /* ColorThiefSwift */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = F085E5B92E35FADC00C84043 /* XCRemoteSwiftPackageReference "ColorThiefSwift" */;
