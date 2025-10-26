@@ -167,6 +167,9 @@ struct ContentView: View {
     var body: some View {
         TabView {
             HomeView(viewModel: homeViewModel)
+                .onOpenURL { url in
+                    TraktService.shared.handle(url: url)
+                }
                 .tabItem {
                     Label("Home", systemImage: "house")
                 }
@@ -179,6 +182,11 @@ struct ContentView: View {
             DebridFilesView()
                 .tabItem {
                     Label("Files", systemImage: "doc.circle")
+                }
+
+            SettingsView()
+                .tabItem {
+                    Label("Settings", systemImage: "gear")
                 }
         }
         .preferredColorScheme(.dark)
@@ -420,6 +428,7 @@ struct MediaDetailView: View {
     @State private var themeColors: [Color] = []
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @StateObject private var traktService = TraktService.shared
 
     private var releaseYear: String {
         (media.releaseDate?.split(separator: "-").first).map(String.init) ?? "N/A"
@@ -520,9 +529,9 @@ struct MediaDetailView: View {
                     .padding(.top, -50).padding(.bottom, 15)
                 
                 if horizontalSizeClass != .regular {
-                    ActionButtonsView(trailerURL: trailerURL) {
+                    ActionButtonsView(trailerURL: trailerURL, addToAction: {
                         librarySearchQuery = searchQuery
-                    }
+                    }, isWatched: traktService.watchedMovieIDs.contains(media.id) || traktService.watchedShowIDs.contains(media.id))
                 } else if let trailerURL {
                      Link(destination: trailerURL) { Label("Play Trailer", systemImage: "play.circle.fill") }
                         .buttonStyle(.bordered)
@@ -769,6 +778,7 @@ struct HeaderView: View {
 struct ActionButtonsView: View {
     let trailerURL: URL?
     let addToAction: () -> Void
+    let isWatched: Bool
 
     var body: some View {
         HStack(spacing: 20) {
@@ -777,6 +787,11 @@ struct ActionButtonsView: View {
             if let trailerURL, UIApplication.shared.canOpenURL(trailerURL) {
                 Link(destination: trailerURL) { Label("Play Trailer", systemImage: "play.circle.fill") }
                     .buttonStyle(.bordered)
+            }
+            if isWatched {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.green)
+                    .font(.title)
             }
         }
         .padding()
@@ -898,7 +913,7 @@ struct TVShowDetailContentView: View {
                                 .padding()
                         } else {
                             ForEach(seasonDetails.episodes) { episode in
-                                EpisodeRowView(showTitle: show.title, episode: episode) { query in librarySearchQuery = query }
+                                EpisodeRowView(showTitle: show.title, episode: episode, showId: show.id) { query in librarySearchQuery = query }
                                 Divider()
                             }
                         }
@@ -922,7 +937,9 @@ struct TVShowDetailContentView: View {
 struct EpisodeRowView: View {
     let showTitle: String
     let episode: Episode
+    let showId: Int
     let addToAction: (String) -> Void
+    @StateObject private var traktService = TraktService.shared
     
     var body: some View {
         HStack {
@@ -931,6 +948,11 @@ struct EpisodeRowView: View {
                 Text(episode.name).font(.custom("Eurostile-Regular", size: 16))
             }
             Spacer()
+            if traktService.watchedEpisodeIDs.contains("\(showId)-\(episode.seasonNumber)-\(episode.episodeNumber)") {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.green)
+                    .font(.title)
+            }
             Button {
                 let query = "\(showTitle) S\(String(format: "%02d", episode.seasonNumber))E\(String(format: "%02d", episode.episodeNumber))"
                 addToAction(query)

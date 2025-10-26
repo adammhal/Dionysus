@@ -246,21 +246,21 @@ class APIService {
     }
 
     func fetchMovies(from endpoint: String) async throws -> [Movie] {
-        let url = URL(string: "\(baseUrl)\(endpoint)?api_key=\(Secrets.tmdbApiKey)")!
+        let url = URL(string: "\(baseUrl)\(endpoint)?api_key=\(SettingsManager.shared.tmdbApiKey)")!
         let response: MovieResponse = try await fetch(from: url)
         return response.results
     }
 
     func fetchTVShows(from endpoint: String) async throws -> [TVShow] {
-        let url = URL(string: "\(baseUrl)\(endpoint)?api_key=\(Secrets.tmdbApiKey)")!
+        let url = URL(string: "\(baseUrl)\(endpoint)?api_key=\(SettingsManager.shared.tmdbApiKey)")!
         let response: TVShowResponse = try await fetch(from: url)
         return response.results
     }
     
     func searchAll(query: String) async throws -> [MediaItem] {
         let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        let movieUrl = URL(string: "\(baseUrl)/search/movie?api_key=\(Secrets.tmdbApiKey)&query=\(encodedQuery)")!
-        let tvShowUrl = URL(string: "\(baseUrl)/search/tv?api_key=\(Secrets.tmdbApiKey)&query=\(encodedQuery)")!
+        let movieUrl = URL(string: "\(baseUrl)/search/movie?api_key=\(SettingsManager.shared.tmdbApiKey)&query=\(encodedQuery)")!
+        let tvShowUrl = URL(string: "\(baseUrl)/search/tv?api_key=\(SettingsManager.shared.tmdbApiKey)&query=\(encodedQuery)")!
         
         async let movies: MovieResponse = fetch(from: movieUrl)
         async let tvShows: TVShowResponse = fetch(from: tvShowUrl)
@@ -274,7 +274,7 @@ class APIService {
 
     func fetchVideos(for media: any Media) async throws -> [Video] {
         let endpoint = media is Movie ? "/movie/\(media.id)/videos" : "/tv/\(media.id)/videos"
-        let url = URL(string: "\(baseUrl)\(endpoint)?api_key=\(Secrets.tmdbApiKey)")!
+        let url = URL(string: "\(baseUrl)\(endpoint)?api_key=\(SettingsManager.shared.tmdbApiKey)")!
         let response: VideoResponse = try await fetch(from: url)
         return response.results.filter { $0.site == "YouTube" }
     }
@@ -310,7 +310,7 @@ class APIService {
     func fetchUserTorrentHashes() async throws -> Set<String> {
         let url = URL(string: "https://api.real-debrid.com/rest/1.0/torrents")!
         var request = URLRequest(url: url)
-        request.setValue("Bearer \(Secrets.realDebridApiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(SettingsManager.shared.realDebridApiKey)", forHTTPHeaderField: "Authorization")
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             throw URLError(.badServerResponse)
@@ -320,18 +320,18 @@ class APIService {
     }
     
     func fetchTVShowDetails(id: Int) async throws -> TVShowDetails {
-        let url = URL(string: "\(baseUrl)/tv/\(id)?api_key=\(Secrets.tmdbApiKey)")!
+        let url = URL(string: "\(baseUrl)/tv/\(id)?api_key=\(SettingsManager.shared.tmdbApiKey)")!
         return try await fetch(from: url)
     }
 
     func fetchSeasonDetails(tvShowId: Int, seasonNumber: Int) async throws -> SeasonDetails {
-        let url = URL(string: "\(baseUrl)/tv/\(tvShowId)/season/\(seasonNumber)?api_key=\(Secrets.tmdbApiKey)")!
+        let url = URL(string: "\(baseUrl)/tv/\(tvShowId)/season/\(seasonNumber)?api_key=\(SettingsManager.shared.tmdbApiKey)")!
         return try await fetch(from: url)
     }
     
     func fetchDiscoverMedia(genreId: Int) async throws -> [MediaItem] {
-        let movieUrl = URL(string: "\(baseUrl)/discover/movie?api_key=\(Secrets.tmdbApiKey)&with_genres=\(genreId)")!
-        let tvUrl = URL(string: "\(baseUrl)/discover/tv?api_key=\(Secrets.tmdbApiKey)&with_genres=\(genreId)")!
+        let movieUrl = URL(string: "\(baseUrl)/discover/movie?api_key=\(SettingsManager.shared.tmdbApiKey)&with_genres=\(genreId)")!
+        let tvUrl = URL(string: "\(baseUrl)/discover/tv?api_key=\(SettingsManager.shared.tmdbApiKey)&with_genres=\(genreId)")!
         
         async let movies: MovieResponse = fetch(from: movieUrl)
         async let tvShows: TVShowResponse = fetch(from: tvUrl)
@@ -352,7 +352,7 @@ class APIService {
         let url = URL(string: "https://api.real-debrid.com/rest/1.0/torrents/addMagnet")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("Bearer \(Secrets.realDebridApiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(SettingsManager.shared.realDebridApiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.httpBody = "magnet=\(magnet.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")".data(using: .utf8)
         
@@ -367,7 +367,7 @@ class APIService {
         let url = URL(string: "https://api.real-debrid.com/rest/1.0/torrents/selectFiles/\(torrentId)")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("Bearer \(Secrets.realDebridApiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(SettingsManager.shared.realDebridApiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.httpBody = "files=all".data(using: .utf8)
         
@@ -378,18 +378,18 @@ class APIService {
     }
     
     func fetchMovie(id: Int) async throws -> Movie {
-        let url = URL(string: "\(baseUrl)/movie/\(id)?api_key=\(Secrets.tmdbApiKey)")!
+        let url = URL(string: "\(baseUrl)/movie/\(id)?api_key=\(SettingsManager.shared.tmdbApiKey)")!
         return try await fetch(from: url)
     }
 
     func fetchTVShow(id: Int) async throws -> TVShow {
-        let url = URL(string: "\(baseUrl)/tv/\(id)?api_key=\(Secrets.tmdbApiKey)")!
+        let url = URL(string: "\(baseUrl)/tv/\(id)?api_key=\(SettingsManager.shared.tmdbApiKey)")!
         return try await fetch(from: url)
     }
     
     func fetchImages(for media: any Media) async throws -> ImagesResponse {
         let endpoint = media is Movie ? "/movie/\(media.id)/images" : "/tv/\(media.id)/images"
-        let url = URL(string: "\(baseUrl)\(endpoint)?api_key=\(Secrets.tmdbApiKey)")!
+        let url = URL(string: "\(baseUrl)\(endpoint)?api_key=\(SettingsManager.shared.tmdbApiKey)")!
         return try await fetch(from: url)
     }
 
@@ -436,7 +436,7 @@ class APIService {
     func fetchTorrents(page: Int) async throws -> [RealDebridTorrent] {
         let url = URL(string: "https://api.real-debrid.com/rest/1.0/torrents?page=\(page)&limit=50")!
         var request = URLRequest(url: url)
-        request.setValue("Bearer \(Secrets.realDebridApiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(SettingsManager.shared.realDebridApiKey)", forHTTPHeaderField: "Authorization")
 
         let (data, response) = try await URLSession.shared.data(for: request)
         
@@ -465,7 +465,7 @@ class APIService {
         let url = URL(string: "https://api.real-debrid.com/rest/1.0/torrents/delete/\(id)")!
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
-        request.setValue("Bearer \(Secrets.realDebridApiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(SettingsManager.shared.realDebridApiKey)", forHTTPHeaderField: "Authorization")
 
         let (data, response) = try await URLSession.shared.data(for: request)
         
