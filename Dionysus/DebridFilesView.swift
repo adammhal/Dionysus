@@ -20,16 +20,19 @@ struct DebridFilesView: View {
                 } else {
                     List {
                         ForEach(viewModel.torrents) { torrent in
-                            TorrentFileRow(torrent: torrent)
-                                .onAppear {
-                                    if torrent.id == viewModel.torrents.last?.id {
-                                        Task {
-                                            await viewModel.fetchTorrents()
-                                        }
+                            TorrentFileRow(torrent: torrent, onDelete: {
+                                Task {
+                                    await viewModel.deleteTorrent(id: torrent.id)
+                                }
+                            })
+                            .onAppear {
+                                if torrent.id == viewModel.torrents.last?.id {
+                                    Task {
+                                        await viewModel.fetchTorrents()
                                     }
                                 }
+                            }
                         }
-                        .onDelete(perform: viewModel.deleteTorrent)
                     }
                     .listStyle(.plain)
                 }
@@ -59,6 +62,7 @@ struct DebridFilesView: View {
 
 struct TorrentFileRow: View {
     let torrent: RealDebridTorrent
+    let onDelete: () -> Void
 
     var body: some View {
         HStack {
@@ -70,6 +74,11 @@ struct TorrentFileRow: View {
                 Text("Status: \(torrent.status)")
                     .font(.subheadline)
                     .foregroundColor(statusColor(for: torrent.status))
+            }
+            Spacer()
+            Button(action: onDelete) {
+                Image(systemName: "trash")
+                    .foregroundColor(.red)
             }
         }
     }

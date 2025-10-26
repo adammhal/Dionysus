@@ -40,22 +40,12 @@ class DebridFilesViewModel: ObservableObject {
         isFetching = false
     }
 
-    func deleteTorrent(at offsets: IndexSet) {
-        let torrentsToDelete = offsets.map { torrents[$0] }
-        HapticManager.shared.impact()
-        Task {
-            for torrent in torrentsToDelete {
-                do {
-                    try await APIService.shared.deleteTorrent(id: torrent.id)
-                    await MainActor.run {
-                        torrents.removeAll { $0.id == torrent.id }
-                    }
-                } catch {
-                    await MainActor.run {
-                        self.errorMessage = "Failed to delete torrent."
-                    }
-                }
-            }
+    func deleteTorrent(id: String) async {
+        do {
+            try await APIService.shared.deleteTorrent(id: id)
+            torrents.removeAll { $0.id == id }
+        } catch {
+            self.errorMessage = "Failed to delete torrent."
         }
     }
 }
