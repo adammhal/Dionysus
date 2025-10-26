@@ -402,6 +402,31 @@ class APIService {
         let response: VideoResolveResponse = try await fetch(from: url)
         return response.directURL
     }
+
+    func fetchTorrents(page: Int) async throws -> [RealDebridTorrent] {
+        let url = URL(string: "https://api.real-debrid.com/rest/1.0/torrents?page=\(page)&limit=50")!
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(Secrets.realDebridApiKey)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw URLError(.badServerResponse)
+        }
+
+        return try JSONDecoder().decode([RealDebridTorrent].self, from: data)
+    }
+
+    func deleteTorrent(id: String) async throws {
+        let url = URL(string: "https://api.real-debrid.com/rest/1.0/torrents/delete/\(id)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("Bearer \(Secrets.realDebridApiKey)", forHTTPHeaderField: "Authorization")
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 204 else {
+            throw URLError(.badServerResponse)
+        }
+    }
 }
 
 extension UIColor {

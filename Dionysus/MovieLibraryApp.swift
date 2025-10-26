@@ -175,6 +175,11 @@ struct ContentView: View {
                 .tabItem {
                     Label("Search", systemImage: "magnifyingglass")
                 }
+
+            DebridFilesView()
+                .tabItem {
+                    Label("Files", systemImage: "doc.circle")
+                }
         }
         .preferredColorScheme(.dark)
     }
