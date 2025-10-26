@@ -1,39 +1,65 @@
 import Foundation
 import SwiftUI
+import Combine
 
 @MainActor
 class DebridFilesViewModel: ObservableObject {
     @Published var torrents: [RealDebridTorrent] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var searchText = ""
 
-    private var currentPage = 1
+    private var allLibraryTorrents: [RealDebridTorrent] = []
     private var isFetching = false
-    private var hasMorePages = true
+    private var searchCancellable: AnyCancellable?
 
-    func fetchTorrents(forceRefresh: Bool = false) async {
-        guard !isFetching, hasMorePages || forceRefresh else { return }
-
-        if forceRefresh {
-            currentPage = 1
-            torrents.removeAll()
-            hasMorePages = true
+    init() {
+        searchCancellable = $searchText
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                self?.filterTorrents()
+            }
+    }
+    
+    private func filterTorrents() {
+        if searchText.isEmpty {
+            torrents = allLibraryTorrents
+        } else {
+            torrents = allLibraryTorrents.filter {
+                $0.filename.localizedCaseInsensitiveContains(searchText)
+            }
         }
+    }
+
+    func loadAllTorrents(forceRefresh: Bool = false) async {
+        guard !isFetching || forceRefresh else { return }
 
         isFetching = true
         isLoading = true
         errorMessage = nil
 
+        if forceRefresh {
+            allLibraryTorrents.removeAll()
+        }
+        
+        var currentPage = 1
+        var hasMorePages = true
+
         do {
-            let fetchedTorrents = try await APIService.shared.fetchTorrents(page: currentPage)
-            if fetchedTorrents.isEmpty {
-                hasMorePages = false
-            } else {
-                torrents.append(contentsOf: fetchedTorrents)
-                currentPage += 1
+            while hasMorePages {
+                let fetchedTorrents = try await APIService.shared.fetchTorrents(page: currentPage)
+                if fetchedTorrents.isEmpty {
+                    hasMorePages = false
+                } else {
+                    allLibraryTorrents.append(contentsOf: fetchedTorrents)
+                    currentPage += 1
+                }
             }
+            filterTorrents()
         } catch {
-            self.errorMessage = "Failed to fetch debrid files."
+            print("!!! VM ERROR (loadAllTorrents): \(error.localizedDescription)")
+            self.errorMessage = "Failed to fetch debrid files. Check console."
         }
 
         isLoading = false
@@ -43,9 +69,11 @@ class DebridFilesViewModel: ObservableObject {
     func deleteTorrent(id: String) async {
         do {
             try await APIService.shared.deleteTorrent(id: id)
-            torrents.removeAll { $0.id == id }
+            allLibraryTorrents.removeAll { $0.id == id }
+            filterTorrents()
         } catch {
-            self.errorMessage = "Failed to delete torrent."
+            print("!!! VM ERROR (deleteTorrent): \(error.localizedDescription)")
+            self.errorMessage = "Failed to delete torrent. Check console."
         }
     }
 }

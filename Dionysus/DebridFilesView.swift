@@ -10,6 +10,7 @@ struct ScrollOffsetPreferenceKey: PreferenceKey {
 struct DebridFilesView: View {
     @StateObject private var viewModel = DebridFilesViewModel()
     @State private var scrollOffset: CGFloat = 0
+    @State private var selectedTorrent: RealDebridTorrent?
 
     var body: some View {
         NavigationStack {
@@ -22,41 +23,11 @@ struct DebridFilesView: View {
                 } else if let errorMessage = viewModel.errorMessage {
                     ErrorView(message: errorMessage) {
                         Task {
-                            await viewModel.fetchTorrents()
+                            await viewModel.loadAllTorrents(forceRefresh: true)
                         }
                     }
                 } else {
-                    List {
-                        ForEach(viewModel.torrents) { torrent in
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    Text(torrent.filename)
-                                        .font(.headline)
-                                    Text("Size: \(formatFileSize(Int64(torrent.bytes)))")
-                                        .font(.subheadline)
-                                    Text("Status: \(torrent.status)")
-                                        .font(.subheadline)
-                                        .foregroundColor(statusColor(for: torrent.status))
-                                }
-                                Spacer()
-                            }
-                            .onAppear {
-                                if torrent.id == viewModel.torrents.last?.id {
-                                    Task {
-                                        await viewModel.fetchTorrents()
-                                    }
-                                }
-                            }
-                        }
-                        .onDelete(perform: deleteItems)
-                    }
-                    .listStyle(.plain)
-                    .background(GeometryReader {
-                        Color.clear.preference(key: ScrollOffsetPreferenceKey.self, value: $0.frame(in: .named("scroll")).minY)
-                    })
-                    .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                        self.scrollOffset = value
-                    }
+                    torrentList
                 }
             }
             .coordinateSpace(name: "scroll")
@@ -70,31 +41,73 @@ struct DebridFilesView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
                         Task {
-                            await viewModel.fetchTorrents(forceRefresh: true)
+                            await viewModel.loadAllTorrents(forceRefresh: true)
                         }
                     }) {
                         Image(systemName: "arrow.clockwise")
                     }
                 }
             }
+            .searchable(text: $viewModel.searchText, prompt: "Search your library")
+            .sheet(item: $selectedTorrent) { torrent in
+                FileDetailsView(torrent: torrent)
+            }
         }
         .onAppear {
             if viewModel.torrents.isEmpty {
                 Task {
-                    await viewModel.fetchTorrents()
+                    await viewModel.loadAllTorrents()
                 }
             }
         }
     }
+    
+    private var torrentList: some View {
+        let list = List {
+            ForEach(viewModel.torrents) { torrent in
+                Button(action: {
+                    selectedTorrent = torrent
+                }) {
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(torrent.filename)
+                                .font(.headline)
+                            Text("Size: \(formatFileSize(Int64(torrent.bytes)))")
+                                .font(.subheadline)
+                            Text("Status: \(torrent.status)")
+                                .font(.subheadline)
+                                .foregroundColor(statusColor(for: torrent.status))
+                        }
+                        Spacer()
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            .onDelete(perform: deleteItems)
+        }
+        .listStyle(.plain)
+        .background(GeometryReader {
+            Color.clear.preference(key: ScrollOffsetPreferenceKey.self, value: $0.frame(in: .named("scroll")).minY)
+        })
+        .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+            self.scrollOffset = value
+        }
+        
+        if #available(iOS 15.0, *) {
+            return list
+        } else {
+            return list
+        }
+    }
 
-    // ✅ Replaces MB-only display with dynamic formatting
     private func formatFileSize(_ bytes: Int64) -> String {
-        let gb = Double(bytes) / 1_073_741_824 // 1024^3
+        let gb = Double(bytes) / 1_073_741_824
         if gb >= 1 {
             return String(format: "%.2f GB", gb)
         }
 
-        let mb = Double(bytes) / 1_048_576 // 1024^2
+        let mb = Double(bytes) / 1_048_576
         if mb >= 1 {
             return String(format: "%.2f MB", mb)
         }

@@ -214,6 +214,20 @@ struct RealDebridTorrent: Codable, Identifiable {
     let status: String
 }
 
+struct RealDebridFile: Codable, Identifiable, Hashable {
+    let id: Int
+    let path: String
+    let bytes: Int
+    let selected: Int
+}
+
+struct RealDebridTorrentInfo: Codable {
+    let id: String
+    let filename: String
+    let bytes: Int
+    let files: [RealDebridFile]
+}
+
 class APIService {
     static let shared = APIService()
     private init() {}
@@ -276,19 +290,14 @@ class APIService {
         
         let url = URL(string: urlString)!
         
-        // --- START: Temporarily inlined fetch logic for debugging ---
-        
-        // 1. Fetch the raw data from the URL
         let (data, response) = try await URLSession.shared.data(from: url)
 
-        // 2. ✅ PRINT THE RAW DATA AS A STRING
         if let jsonString = String(data: data, encoding: .utf8) {
             print("--- RAW TORRENT API RESPONSE ---")
             print(jsonString)
             print("------------------------------")
         }
 
-        // 3. Check the response and decode the data as before
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             throw URLError(.badServerResponse)
         }
@@ -296,8 +305,6 @@ class APIService {
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         let torrentResponse = try decoder.decode(TorrentResponse.self, from: data)
         return torrentResponse.data
-        
-        // --- END: Temporarily inlined fetch logic ---
     }
     
     func fetchUserTorrentHashes() async throws -> Set<String> {
@@ -403,17 +410,55 @@ class APIService {
         return response.directURL
     }
 
+    func fetchTorrentInfo(id: String) async throws -> RealDebridTorrentInfo {
+        let url = URL(string: "https://api.real-debrid.com/rest/1.0/torrents/info/\(id)")!
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(Secrets.realDebridApiKey)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("!!! FETCH INFO FAILED: Response was not HTTP")
+            throw URLError(.cannotParseResponse)
+        }
+        
+        if httpResponse.statusCode == 200 {
+            return try JSONDecoder().decode(RealDebridTorrentInfo.self, from: data)
+        }
+
+        print("!!! FETCH INFO FAILED: HTTP Status Code: \(httpResponse.statusCode)")
+        if let errorBody = String(data: data, encoding: .utf8) {
+            print("!!! ERROR BODY: \(errorBody)")
+        }
+        throw URLError(.badServerResponse)
+    }
+
     func fetchTorrents(page: Int) async throws -> [RealDebridTorrent] {
         let url = URL(string: "https://api.real-debrid.com/rest/1.0/torrents?page=\(page)&limit=50")!
         var request = URLRequest(url: url)
         request.setValue("Bearer \(Secrets.realDebridApiKey)", forHTTPHeaderField: "Authorization")
 
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw URLError(.badServerResponse)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("!!! FETCH FAILED: Response was not HTTP")
+            throw URLError(.cannotParseResponse)
+        }
+        
+        if httpResponse.statusCode == 200 {
+            return try JSONDecoder().decode([RealDebridTorrent].self, from: data)
+        }
+        
+        if httpResponse.statusCode == 204 {
+            print("--- DEBUG: Received 204 No Content, treating as empty page.")
+            return []
         }
 
-        return try JSONDecoder().decode([RealDebridTorrent].self, from: data)
+        print("!!! FETCH FAILED: HTTP Status Code: \(httpResponse.statusCode)")
+        if let errorBody = String(data: data, encoding: .utf8) {
+            print("!!! ERROR BODY: \(errorBody)")
+        }
+        throw URLError(.badServerResponse)
     }
 
     func deleteTorrent(id: String) async throws {
@@ -422,8 +467,18 @@ class APIService {
         request.httpMethod = "DELETE"
         request.setValue("Bearer \(Secrets.realDebridApiKey)", forHTTPHeaderField: "Authorization")
 
-        let (_, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 204 else {
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("!!! DELETE FAILED: Response was not HTTP")
+            throw URLError(.cannotParseResponse)
+        }
+        
+        if httpResponse.statusCode != 204 {
+            print("!!! DELETE FAILED: HTTP Status Code: \(httpResponse.statusCode)")
+            if let errorBody = String(data: data, encoding: .utf8) {
+                print("!!! ERROR BODY: \(errorBody)")
+            }
             throw URLError(.badServerResponse)
         }
     }
