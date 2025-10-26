@@ -32,7 +32,7 @@ struct DebridFilesView: View {
                                 VStack(alignment: .leading) {
                                     Text(torrent.filename)
                                         .font(.headline)
-                                    Text("Size: \(torrent.bytes / 1024 / 1024) MB")
+                                    Text("Size: \(formatFileSize(Int64(torrent.bytes)))")
                                         .font(.subheadline)
                                     Text("Status: \(torrent.status)")
                                         .font(.subheadline)
@@ -85,6 +85,26 @@ struct DebridFilesView: View {
                 }
             }
         }
+    }
+
+    // ✅ Replaces MB-only display with dynamic formatting
+    private func formatFileSize(_ bytes: Int64) -> String {
+        let gb = Double(bytes) / 1_073_741_824 // 1024^3
+        if gb >= 1 {
+            return String(format: "%.2f GB", gb)
+        }
+
+        let mb = Double(bytes) / 1_048_576 // 1024^2
+        if mb >= 1 {
+            return String(format: "%.2f MB", mb)
+        }
+
+        let kb = Double(bytes) / 1024
+        if kb >= 1 {
+            return String(format: "%.2f KB", kb)
+        }
+
+        return "\(bytes) B"
     }
 
     private func deleteItems(at offsets: IndexSet) {
