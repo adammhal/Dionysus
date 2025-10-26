@@ -26,8 +26,17 @@ struct DebridFilesView: View {
                         }
                     }
                 } else {
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.white.opacity(0.5))
+                        TextField("Search...", text: $viewModel.searchText)
+                            .foregroundColor(.white)
+                    }
+                    .glassmorphicStyle()
+                    .padding(.horizontal)
+
                     List {
-                        ForEach(viewModel.torrents) { torrent in
+                        ForEach(viewModel.filteredTorrents) { torrent in
                             HStack {
                                 VStack(alignment: .leading) {
                                     Text(torrent.filename)
@@ -49,8 +58,10 @@ struct DebridFilesView: View {
                             }
                         }
                         .onDelete(perform: deleteItems)
+                        .listRowBackground(Color.clear)
                     }
                     .listStyle(.plain)
+                    .background(Color.clear)
                     .background(GeometryReader {
                         Color.clear.preference(key: ScrollOffsetPreferenceKey.self, value: $0.frame(in: .named("scroll")).minY)
                     })
