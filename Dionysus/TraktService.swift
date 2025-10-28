@@ -9,6 +9,7 @@ class TraktService: ObservableObject {
     @Published var watchedMovieIDs = Set<Int>()
     @Published var watchedShowIDs = Set<Int>()
     @Published var watchedEpisodeIDs = Set<String>()
+    @Published var watchedEpisodeCounts = [Int: Int]()
 
     private var accessToken: String? {
         didSet {
@@ -26,6 +27,8 @@ class TraktService: ObservableObject {
     private init() {
         self.accessToken = KeychainHelper.shared.read(for: "trakt_access_token")
         self.refreshToken = KeychainHelper.shared.read(for: "trakt_refresh_token")
+        
+        checkAndRefreshToken()
     }
 
     var authorizationURL: URL {
@@ -67,12 +70,67 @@ class TraktService: ObservableObject {
                 self.isAuthenticating = false
             }
             guard let data = data,
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let httpResponse = response as? HTTPURLResponse,
+                  httpResponse.statusCode == 200 else {
+                return
+            }
+            
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let accessToken = json["access_token"] as? String,
                   let refreshToken = json["refresh_token"] as? String else {
                 return
             }
             self.saveTokens(accessToken: accessToken, refreshToken: refreshToken)
+        }.resume()
+    }
+    
+    func checkAndRefreshToken() {
+        guard let currentRefreshToken = self.refreshToken else {
+            DispatchQueue.main.async {
+                self.isAuthenticated = false
+            }
+            return
+        }
+        
+        isAuthenticating = true
+        let url = URL(string: "https://api.trakt.tv/oauth/token")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = [
+            "refresh_token": currentRefreshToken,
+            "client_id": Secrets.traktClientID,
+            "client_secret": Secrets.traktClientSecret,
+            "redirect_uri": Secrets.traktCallbackURL,
+            "grant_type": "refresh_token"
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            DispatchQueue.main.async {
+                self.isAuthenticating = false
+            }
+            
+            guard let data = data,
+                  let httpResponse = response as? HTTPURLResponse else {
+                return
+            }
+            
+            guard httpResponse.statusCode == 200 else {
+                DispatchQueue.main.async {
+                    self.signOut()
+                }
+                return
+            }
+            
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let newAccessToken = json["access_token"] as? String,
+                  let newRefreshToken = json["refresh_token"] as? String else {
+                return
+            }
+            
+            self.saveTokens(accessToken: newAccessToken, refreshToken: newRefreshToken)
+            
         }.resume()
     }
 
@@ -81,6 +139,12 @@ class TraktService: ObservableObject {
         KeychainHelper.shared.delete(for: "trakt_refresh_token")
         self.accessToken = nil
         self.refreshToken = nil
+        DispatchQueue.main.async {
+            self.watchedMovieIDs = Set<Int>()
+            self.watchedShowIDs = Set<Int>()
+            self.watchedEpisodeIDs = Set<String>()
+            self.watchedEpisodeCounts = [Int: Int]()
+        }
     }
 
     private func saveTokens(accessToken: String, refreshToken: String) {
@@ -125,18 +189,26 @@ class TraktService: ObservableObject {
             }
             let showIDs = watchedShows.compactMap { $0.show.ids.tmdb }
             var episodeIDs = Set<String>()
+            var episodeCounts = [Int: Int]()
+            
             for show in watchedShows {
                 guard let showID = show.show.ids.tmdb else { continue }
+                var countForShow = 0
                 for season in show.seasons {
                     for episode in season.episodes {
                         episodeIDs.insert("\(showID)-\(season.number)-\(episode.number)")
+                        countForShow += 1
                     }
                 }
+                episodeCounts[showID] = countForShow
             }
+            
             DispatchQueue.main.async {
                 self.watchedShowIDs = Set(showIDs)
                 self.watchedEpisodeIDs = episodeIDs
+                self.watchedEpisodeCounts = episodeCounts
             }
         }.resume()
     }
 }
+

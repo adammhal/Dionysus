@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 import CoreHaptics
-import PencilKit // Import PencilKit for Apple Pencil haptics support
+import PencilKit
 
 @main
 struct DionysusApp: App {
@@ -12,7 +12,6 @@ struct DionysusApp: App {
     }
 }
 
-// MARK: - ViewModels
 
 @MainActor
 class HomeViewModel: ObservableObject {
@@ -27,7 +26,6 @@ class HomeViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         do {
-            // Removed the artificial 1.5-second delay to improve startup time.
             async let trendingMoviesFetch = APIService.shared.fetchMovies(from: "/trending/movie/week")
             async let popularMoviesFetch = APIService.shared.fetchMovies(from: "/movie/popular")
             async let trendingShowsFetch = APIService.shared.fetchTVShows(from: "/trending/tv/week")
@@ -40,7 +38,8 @@ class HomeViewModel: ObservableObject {
             self.popularShows = popShows.map(MediaItem.tvShow)
             HapticManager.shared.success()
         } catch {
-            self.errorMessage = "Failed to load content."
+             self.errorMessage = "Failed to load content. Error: \(error.localizedDescription)"
+             print("Error loading content: \(error)")
         }
         isLoading = false
     }
@@ -73,6 +72,10 @@ enum LoadingState {
     case idle, loading, success, error
 }
 
+enum WatchStatus {
+    case unwatched, inProgress, completed
+}
+
 @MainActor
 class LibraryViewModel: ObservableObject {
     @Published var torrents: [Torrent] = []
@@ -80,7 +83,7 @@ class LibraryViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var addState: LoadingState = .idle
     @Published var existingTorrentHashes: Set<String> = []
-    
+
     func fetchTorrents(for query: String, forceRefresh: Bool = false) async {
         isLoading = true
         errorMessage = nil
@@ -96,7 +99,7 @@ class LibraryViewModel: ObservableObject {
         }
         isLoading = false
     }
-    
+
     func addTorrent(magnet: String) async {
         addState = .loading
         do {
@@ -118,8 +121,9 @@ class TVDetailViewModel: ObservableObject {
     @Published var selectedSeasonDetails: SeasonDetails?
     @Published var isLoadingDetails = false
     @Published var isLoadingSeason = false
-    
+
     func fetchDetails(for showId: Int) async {
+        guard showDetails == nil else { return }
         isLoadingDetails = true
         do {
             showDetails = try await APIService.shared.fetchTVShowDetails(id: showId)
@@ -127,17 +131,17 @@ class TVDetailViewModel: ObservableObject {
                 await fetchSeason(tvShowId: showId, seasonNumber: firstSeason.seasonNumber)
             }
         } catch {
-            
+
         }
         isLoadingDetails = false
     }
-    
+
     func fetchSeason(tvShowId: Int, seasonNumber: Int) async {
         isLoadingSeason = true
         do {
             selectedSeasonDetails = try await APIService.shared.fetchSeasonDetails(tvShowId: tvShowId, seasonNumber: seasonNumber)
         } catch {
-            
+
         }
         isLoadingSeason = false
     }
@@ -147,19 +151,17 @@ class TVDetailViewModel: ObservableObject {
 class GenreViewModel: ObservableObject {
     @Published var media: [MediaItem] = []
     @Published var isLoading = true
-    
+
     func loadMedia(for genreId: Int) async {
         isLoading = true
         do {
             media = try await APIService.shared.fetchDiscoverMedia(genreId: genreId)
         } catch {
-            
+
         }
         isLoading = false
     }
 }
-
-// MARK: - Main Content Views
 
 struct ContentView: View {
     @StateObject private var homeViewModel = HomeViewModel()
@@ -195,7 +197,7 @@ struct ContentView: View {
 
 struct HomeView: View {
     @ObservedObject var viewModel: HomeViewModel
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -234,7 +236,7 @@ struct HomeView: View {
 struct MediaCarouselView: View {
     let title: String
     let items: [MediaItem]
-    
+
     @State private var pressedItemId: Int? = nil
     @State private var centeredItemID: Int?
 
@@ -274,12 +276,10 @@ struct MediaCarouselView: View {
     }
 }
 
-// MARK: - iPad Optimized Search View
-
 struct SearchView: View {
     @StateObject private var viewModel = SearchViewModel()
     @State private var selectedMediaItem: MediaItem?
-    
+
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var isSplitView: Bool {
@@ -297,19 +297,15 @@ struct SearchView: View {
         (Genre(id: 878, name: "Sci-Fi"), [.blue, .cyan]), (Genre(id: 53, name: "Thriller"), [.cyan, .black]),
         (Genre(id: 10752, name: "War"), [.green, .gray]), (Genre(id: 37, name: "Western"), [.yellow, .black])
     ]
-    
+
     var body: some View {
         if isSplitView {
             NavigationSplitView {
-                // By wrapping the sidebar in its own NavigationStack, we create an unambiguous
-                // context for push navigation that is separate from the split view's master-detail behavior.
                 NavigationStack {
                     sidebarView
                         .navigationDestination(for: Genre.self) { genre in
                             GenreResultsView(genre: genre)
                         }
-                        // This destination now correctly handles pushes from within the sidebar's stack,
-                        // such as navigating from GenreResultsView to MediaDetailView.
                         .navigationDestination(for: MediaItem.self) { item in
                             MediaDetailView(media: item.underlyingMedia, showCustomDismissButton: true)
                         }
@@ -346,10 +342,7 @@ struct SearchView: View {
                 else if let errorMessage = viewModel.errorMessage { Text(errorMessage) }
                 else if viewModel.searchResults.isEmpty { ContentUnavailableView.search(text: viewModel.query) }
                 else {
-                    // The NavigationLink here correctly updates the `selectedMediaItem` to drive the detail view,
-                    // as it's not ambiguous anymore thanks to the explicit NavigationStack.
                     if isSplitView {
-                        // For iPad: Keep the selection binding to drive the detail view.
                         List(viewModel.searchResults, selection: $selectedMediaItem) { item in
                             NavigationLink(value: item) {
                                 SearchResultRow(media: item.underlyingMedia)
@@ -371,8 +364,7 @@ struct SearchView: View {
                         .listStyle(.plain)
                         .padding(.bottom, 80)
                     } else {
-                        // For iPhone: Remove the selection binding to allow push navigation.
-                        List(viewModel.searchResults) { item in // No selection parameter here
+                        List(viewModel.searchResults) { item in
                             NavigationLink(value: item) {
                                 SearchResultRow(media: item.underlyingMedia)
                                     .onDrag {
@@ -387,9 +379,6 @@ struct SearchView: View {
                                         MediaPosterView(media: item.underlyingMedia)
                                             .frame(width: 150, height: 225)
                                     }
-                                    // Note: The sensory feedback trigger won't activate here since
-                                    // selectedMediaItem is not used in the iPhone layout, but
-                                    // it doesn't harm anything to leave it.
                                     .sensoryFeedback(.impact(weight: .light), trigger: selectedMediaItem)
                             }
                         }
@@ -415,17 +404,19 @@ struct SearchView: View {
     }
 }
 
-
-// MARK: - iPad Optimized Detail View
-
 struct MediaDetailView: View {
     let media: any Media
     let showCustomDismissButton: Bool
-    
+
+    @StateObject private var tvViewModel = TVDetailViewModel()
     @State private var trailerURL: URL?
+    @State private var watchProviders: WatchProviderCountryResult?
+    @State private var isLoadingProviders = false
     @State private var showContent = false
     @State private var librarySearchQuery: String?
     @State private var themeColors: [Color] = []
+    @State private var showProvidersSheet = false
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @StateObject private var traktService = TraktService.shared
@@ -433,9 +424,44 @@ struct MediaDetailView: View {
     private var releaseYear: String {
         (media.releaseDate?.split(separator: "-").first).map(String.init) ?? "N/A"
     }
-    
+
     private var searchQuery: String {
         (media is TVShow) ? "\(media.title) complete" : "\(media.title) \(releaseYear)"
+    }
+
+    private var watchStatus: WatchStatus {
+        if let movie = media as? Movie {
+            return traktService.watchedMovieIDs.contains(movie.id) ? .completed : .unwatched
+        } else if let show = media as? TVShow {
+            let watchedCount = traktService.watchedEpisodeCounts[show.id] ?? 0
+
+            if let details = tvViewModel.showDetails {
+                var totalEpisodes = 0
+                for season in details.seasons {
+                    if season.seasonNumber > 0 {
+                        totalEpisodes += (season.episodeCount ?? 0)
+                    }
+                }
+
+                if watchedCount == 0 {
+                    return .unwatched
+                } else if totalEpisodes > 0 && watchedCount >= totalEpisodes {
+                    return .completed
+                } else {
+                    return .inProgress
+                }
+
+            } else {
+                if watchedCount > 0 {
+                    return .inProgress
+                }
+                if traktService.watchedShowIDs.contains(show.id) {
+                    return .inProgress
+                }
+                return .unwatched
+            }
+        }
+        return .unwatched
     }
 
     var body: some View {
@@ -452,12 +478,33 @@ struct MediaDetailView: View {
             }
         }
         .task {
+            isLoadingProviders = true
             async let colorTask: () = fetchAndSetThemeColors()
             async let videoTask: () = fetchVideos()
-            _ = await (colorTask, videoTask)
+            async let providersTask: () = fetchProviders()
+            if let show = media as? TVShow {
+                await tvViewModel.fetchDetails(for: show.id)
+            }
+            _ = await (colorTask, videoTask, providersTask)
+            isLoadingProviders = false
         }
+        .sheet(isPresented: $showProvidersSheet) {
+             NavigationView { // Wrap in NavigationView for title and button
+                 // Pass nil if providers haven't loaded or are truly empty
+                 WatchProvidersView(providers: watchProviders)
+                     .navigationTitle("Where to Watch")
+                     .navigationBarTitleDisplayMode(.inline)
+                     .toolbar {
+                         ToolbarItem(placement: .navigationBarTrailing) {
+                             Button("Done") { showProvidersSheet = false }
+                         }
+                     }
+             }
+             .preferredColorScheme(.dark)
+             .presentationDetents([.medium, .large])
+         }
     }
-    
+
     private var iPadDetailLayout: some View {
         HStack(alignment: .top, spacing: 0) {
             mainDetailContent
@@ -523,24 +570,38 @@ struct MediaDetailView: View {
                 .scaleEffect(scrollY > 0 ? (scrollY / 1000) + 1 : 1, anchor: .bottom)
             }
             .frame(height: 300)
-            
+
             VStack(alignment: .leading, spacing: 0) {
                 HeaderView(media: media, releaseYear: releaseYear)
                     .padding(.top, -50).padding(.bottom, 15)
-                
+
                 if horizontalSizeClass != .regular {
-                    ActionButtonsView(trailerURL: trailerURL, addToAction: {
-                        librarySearchQuery = searchQuery
-                    }, isWatched: traktService.watchedMovieIDs.contains(media.id) || traktService.watchedShowIDs.contains(media.id))
+                    ActionButtonsView(
+                        trailerURL: trailerURL,
+                        addToAction: { librarySearchQuery = searchQuery },
+                        watchStatus: watchStatus,
+                        // Button is now always shown, disabled state handled inside
+                        providersAction: {
+                             // Only open sheet if providers have loaded (even if empty)
+                             if !isLoadingProviders {
+                                 showProvidersSheet = true
+                             }
+                         }
+                    )
+                    .disabled(isLoadingProviders) // Disable button while loading
+                    .padding(.bottom)
                 } else if let trailerURL {
                      Link(destination: trailerURL) { Label("Play Trailer", systemImage: "play.circle.fill") }
                         .buttonStyle(.bordered)
                         .padding()
+                    // Consider adding providers button for iPad similarly if needed
                 }
 
+
                 if let show = media as? TVShow {
-                    TVShowDetailContentView(show: show, themeColor: themeColors.first)
+                    TVShowDetailContentView(viewModel: tvViewModel, show: show, themeColor: themeColors.first)
                 }
+
                 OverviewView(overview: media.overview)
             }
             .padding(.bottom, 120).opacity(showContent ? 1 : 0)
@@ -549,14 +610,14 @@ struct MediaDetailView: View {
         .background(Color.clear)
         .ignoresSafeArea(edges: horizontalSizeClass == .regular ? [] : .all)
     }
-    
+
     private func fetchVideos() async {
         do {
             let videos = try await APIService.shared.fetchVideos(for: media)
             self.trailerURL = videos.first?.youtubeURL
         } catch { }
     }
-    
+
     private func fetchAndSetThemeColors() async {
         guard let posterPath = media.posterPath, let url = URL(string: "https://image.tmdb.org/t/p/w500\(posterPath)") else { return }
         do {
@@ -567,21 +628,128 @@ struct MediaDetailView: View {
             await MainActor.run { withAnimation { self.themeColors = newColors } }
         } catch { }
     }
+
+    private func fetchProviders() async {
+        do {
+            watchProviders = try await APIService.shared.fetchWatchProviders(for: media)
+        } catch {
+            print("Failed to fetch watch providers: \(error)")
+             // Set to nil on error so the sheet shows the correct message
+             watchProviders = nil
+        }
+    }
 }
 
-// MARK: - Renamed SourcesView (was LibraryActionSheetView)
+struct WatchProviderLogoView: View {
+    let provider: WatchProviderDetail
+    var body: some View {
+        CachedAsyncImage(url: provider.logoPath.flatMap { URL(string: "https://image.tmdb.org/t/p/w92\($0)") }) { phase in
+             switch phase {
+             case .success(let image):
+                 image.resizable()
+                      .aspectRatio(contentMode: .fit)
+                      .frame(width: 50, height: 50)
+                      .clipShape(RoundedRectangle(cornerRadius: 10))
+                      .overlay(
+                          RoundedRectangle(cornerRadius: 10)
+                              .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                      )
+                      .padding(.vertical, 4)
+             default:
+                 RoundedRectangle(cornerRadius: 10)
+                      .fill(Color.gray.opacity(0.3))
+                      .frame(width: 50, height: 50)
+                      .padding(.vertical, 4)
+             }
+         }
+    }
+}
+
+struct WatchProvidersView: View {
+    // Make providers optional to handle loading/error states gracefully
+    let providers: WatchProviderCountryResult?
+
+    // Computed properties now handle the optional provider safely
+    private var streamingProviders: [WatchProviderDetail] {
+        (providers?.flatrate ?? []).sorted { $0.displayPriority ?? 99 < $1.displayPriority ?? 99 }
+    }
+    private var rentProviders: [WatchProviderDetail] {
+        (providers?.rent ?? []).sorted { $0.displayPriority ?? 99 < $1.displayPriority ?? 99 }
+    }
+    private var buyProviders: [WatchProviderDetail] {
+        (providers?.buy ?? []).sorted { $0.displayPriority ?? 99 < $1.displayPriority ?? 99 }
+    }
+
+    // Check if *any* providers exist
+    private var hasAnyProviders: Bool {
+        !(streamingProviders.isEmpty && rentProviders.isEmpty && buyProviders.isEmpty)
+    }
+
+    var body: some View {
+         ScrollView {
+             VStack(alignment: .leading, spacing: 20) {
+                 // Only show sections if providers exist
+                 if hasAnyProviders {
+                     if !streamingProviders.isEmpty {
+                         providerSection(title: "Stream", items: streamingProviders)
+                     }
+                     if !rentProviders.isEmpty {
+                         providerSection(title: "Rent", items: rentProviders)
+                     }
+                     if !buyProviders.isEmpty {
+                        providerSection(title: "Buy", items: buyProviders)
+                     }
+
+                     // Show JustWatch link only if there are providers
+                     if let link = providers?.link, let url = URL(string: link) {
+                         Link("View all options on JustWatch", destination: url)
+                             .font(.caption)
+                             .foregroundColor(.secondary)
+                             .padding(.top, 10)
+                             .frame(maxWidth: .infinity, alignment: .center)
+                     }
+                 } else {
+                     // Show message if no providers were found (or if providers is nil)
+                     Text("Not available on streaming, rent, or purchase services in your region.")
+                         .font(.custom("Eurostile-Regular", size: 16))
+                         .foregroundColor(.secondary)
+                         .multilineTextAlignment(.center)
+                         .padding()
+                         .frame(maxWidth: .infinity, alignment: .center)
+                 }
+             }
+             .padding()
+         }
+    }
+
+    @ViewBuilder
+    private func providerSection(title: String, items: [WatchProviderDetail]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.custom("Eurostile-Regular", size: 20))
+                .foregroundStyle(.primary)
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 60))], spacing: 15) {
+                 ForEach(items) { provider in
+                     WatchProviderLogoView(provider: provider)
+                 }
+            }
+        }
+    }
+}
+
 
 struct SourcesView: View {
     @StateObject private var viewModel = LibraryViewModel()
     let searchQuery: String
-    
+
     @State private var selectedQuality: String = "All"
     @State private var selectedAVQuality: AVQuality = .normal
     @State private var filterText: String = ""
     @State private var selectedProvider: String = "All"
-    
+
     private let qualityOptions = ["All", "2160p", "1080p", "720p"]
-    
+
     private var finalSearchQuery: String {
         var query = searchQuery
         if let term = selectedAVQuality.queryTerm {
@@ -589,9 +757,9 @@ struct SourcesView: View {
         }
         return query
     }
-    
+
     private var providerOptions: [String] { ["All"] + Set(viewModel.torrents.compactMap { $0.provider }).sorted() }
-    
+
     private var filteredTorrents: [Torrent] {
         var torrents = viewModel.torrents.filter { $0.magnet != nil }
         if selectedQuality != "All" { torrents = torrents.filter { $0.quality == selectedQuality } }
@@ -601,7 +769,6 @@ struct SourcesView: View {
     }
     var body: some View {
         ZStack {
-            // Removed the nested NavigationStack to prevent conflicts with NavigationSplitView.
             VStack {
                 VStack {
                     Picker("Quality", selection: $selectedQuality) { ForEach(qualityOptions, id: \.self) { Text($0) } }.pickerStyle(.segmented)
@@ -657,8 +824,6 @@ struct SourcesView: View {
         }
     }
 }
-
-// MARK: - Reusable UI Components
 
 struct BlobBackgroundView: View {
     @State var animate = false
@@ -726,7 +891,7 @@ struct MediaPosterView: View {
 
 struct SearchResultRow: View {
     let media: any Media
-    
+
     var body: some View {
         HStack(spacing: 15) {
             MediaPosterView(media: media).frame(width: 70, height: 105)
@@ -746,7 +911,7 @@ struct SearchResultRow: View {
 struct ErrorView: View {
     let message: String
     let retryAction: () -> Void
-    
+
     var body: some View {
         VStack(spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill").font(.largeTitle).foregroundColor(.red)
@@ -759,12 +924,12 @@ struct ErrorView: View {
 struct HeaderView: View {
     let media: any Media
     let releaseYear: String
-    
+
     var body: some View {
         HStack(alignment: .bottom, spacing: 20) {
             MediaPosterView(media: media)
                 .frame(width: 120, height: 180)
-            
+
             VStack(alignment: .leading) {
                 Text(media.title).font(.custom("Eurostile-Regular", size: 28))
                 Text("\(releaseYear) • \(String(format: "%.1f", media.voteAverage)) ★")
@@ -778,25 +943,55 @@ struct HeaderView: View {
 struct ActionButtonsView: View {
     let trailerURL: URL?
     let addToAction: () -> Void
-    let isWatched: Bool
+    let watchStatus: WatchStatus
+    // Removed showProvidersButton parameter
+    let providersAction: () -> Void
 
     var body: some View {
-        HStack(spacing: 20) {
-            Button(action: addToAction) { Label("Add to Library", systemImage: "plus.circle.fill") }
-                .buttonStyle(.borderedProminent).tint(.blue)
-            if let trailerURL, UIApplication.shared.canOpenURL(trailerURL) {
-                Link(destination: trailerURL) { Label("Play Trailer", systemImage: "play.circle.fill") }
-                    .buttonStyle(.bordered)
+        HStack(spacing: 12) {
+            Button(action: addToAction) {
+                Label("Add to Library", systemImage: "plus.circle.fill")
             }
-            if isWatched {
+            .buttonStyle(.borderedProminent).tint(.blue)
+            .font(.callout)
+            .fixedSize()
+
+            if let trailerURL, UIApplication.shared.canOpenURL(trailerURL) {
+                Link(destination: trailerURL) {
+                    Label("Trailer", systemImage: "play.circle.fill")
+                }
+                .buttonStyle(.bordered)
+                .font(.callout)
+                .fixedSize()
+            }
+
+            // Watch Providers Button - Always visible
+            Button(action: providersAction) {
+                Image(systemName: "play.tv.fill")
+            }
+            .buttonStyle(.bordered)
+            .font(.callout)
+            .tint(.purple)
+
+            Spacer()
+
+            switch watchStatus {
+            case .completed:
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(.green)
-                    .font(.title)
+                    .font(.title2)
+            case .inProgress:
+                Image(systemName: "circle.dashed.inset.filled")
+                    .foregroundColor(.blue)
+                    .font(.title2)
+            case .unwatched:
+                EmptyView()
             }
         }
-        .padding()
+        .padding(.horizontal)
     }
 }
+
 
 struct OverviewView: View {
     let overview: String
@@ -813,9 +1008,9 @@ enum AVQuality: String, CaseIterable, Identifiable {
     case normal = "Normal"
     case dolbyVision = "Dolby Vision"
     case dolbyAtmos = "Dolby Atmos"
-    
+
     var id: String { self.rawValue }
-    
+
     var queryTerm: String? {
         switch self {
         case .normal: return nil
@@ -829,7 +1024,7 @@ struct TorrentRowView: View {
     let torrent: Torrent
     let isAlreadyAdded: Bool
     let addAction: (String) -> Void
-    
+
     var body: some View {
         Button(action: { if let magnet = torrent.magnet { HapticManager.shared.impact(); addAction(magnet) } }) {
             VStack(alignment: .leading, spacing: 10) {
@@ -854,12 +1049,12 @@ struct TorrentRowView: View {
 }
 
 struct TVShowDetailContentView: View {
-    @StateObject private var viewModel = TVDetailViewModel()
+    @ObservedObject var viewModel: TVDetailViewModel
     let show: TVShow
     let themeColor: Color?
     @State private var selectedSeason: Int = 1
     @State private var librarySearchQuery: String?
-    
+
     var body: some View {
         VStack(alignment: .leading) {
             if viewModel.isLoadingDetails { ProgressView().padding() }
@@ -883,7 +1078,7 @@ struct TVShowDetailContentView: View {
                             Image(systemName: "sparkles")
                                 .font(.title3)
                                 .foregroundStyle(.yellow)
-                            
+
                             VStack(alignment: .leading) {
                                 Text("Season \(selectedSeason)")
                                     .font(.custom("Eurostile-Regular", size: 14)).foregroundColor(.secondary)
@@ -905,7 +1100,7 @@ struct TVShowDetailContentView: View {
                         .padding(.vertical, 8)
 
                         Divider()
-                        
+
                         if seasonDetails.episodes.isEmpty {
                             Text("No episodes found for this season.")
                                 .font(.custom("Eurostile-Regular", size: 16))
@@ -923,7 +1118,6 @@ struct TVShowDetailContentView: View {
             }
         }
         .task {
-            await viewModel.fetchDetails(for: show.id)
             if let firstSeason = viewModel.showDetails?.seasons.first(where: { $0.seasonNumber > 0 }) ?? viewModel.showDetails?.seasons.first { selectedSeason = firstSeason.seasonNumber }
         }
         .sheet(item: $librarySearchQuery) { query in
@@ -940,7 +1134,7 @@ struct EpisodeRowView: View {
     let showId: Int
     let addToAction: (String) -> Void
     @StateObject private var traktService = TraktService.shared
-    
+
     var body: some View {
         HStack {
             VStack(alignment: .leading) {
@@ -981,7 +1175,7 @@ struct GenreResultsView: View {
     @StateObject private var viewModel = GenreViewModel()
     let genre: Genre
     private let columns = [GridItem(.flexible()), GridItem(.flexible())]
-    
+
     var body: some View {
         ScrollView {
             if viewModel.isLoading { ProgressView() }
@@ -1001,7 +1195,7 @@ struct GenreResultsView: View {
 
 struct StatusOverlayView: View {
     @Binding var addState: LoadingState
-    
+
     var body: some View {
         ZStack {
             Rectangle().fill(.black.opacity(0.5)).ignoresSafeArea()
@@ -1047,8 +1241,6 @@ struct HomeLoadingView: View {
     }
 }
 
-// MARK: - Helpers & Extensions
-
 struct Shimmer: ViewModifier {
     @State private var phase: CGFloat = -2.0
     func body(content: Content) -> some View {
@@ -1077,7 +1269,7 @@ extension View {
 
 class HapticManager {
     static let shared = HapticManager()
-    
+
     #if os(iOS)
     private let selectionGenerator = UISelectionFeedbackGenerator()
     private let impactGenerator = UIImpactFeedbackGenerator(style: .medium)
@@ -1095,7 +1287,7 @@ class HapticManager {
         notificationGenerator.prepare()
         #endif
     }
-    
+
     func start() {}
     func stop() {}
 
@@ -1104,7 +1296,7 @@ class HapticManager {
         impactGenerator.impactOccurred()
         #endif
     }
-    
+
     func success() {
         #if os(iOS)
         notificationGenerator.notificationOccurred(.success)
@@ -1127,7 +1319,7 @@ class HapticManager {
 struct CachedAsyncImage<Content: View>: View {
     let url: URL?
     @ViewBuilder let content: (AsyncImagePhase) -> Content
-    
+
     var body: some View {
         if let url = url, let image = ImageCache.shared.get(forKey: url) {
             content(.success(Image(uiImage: image)))
@@ -1142,11 +1334,11 @@ struct CachedAsyncImage<Content: View>: View {
             }
         }
     }
-    
+
     private struct CacheActionView: View {
         let url: URL
         let image: Image
-        
+
         var body: some View {
             Color.clear.frame(width: 0, height: 0).onAppear {
                 #if os(iOS)
