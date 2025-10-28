@@ -159,6 +159,7 @@ struct Torrent: Codable, Identifiable, Hashable {
         }
     }
 
+    
     var infoHash: String? {
         guard let magnet = magnet,
               let range = magnet.range(of: "urn:btih:") else { return nil }

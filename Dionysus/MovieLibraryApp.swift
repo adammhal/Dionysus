@@ -853,7 +853,6 @@ struct BlobBackgroundView: View {
     }
 }
 
-
 struct DionysusTitleView: View {
     var body: some View {
         Text("Dionysus").font(.custom("Eurostile-Regular", size: 34))
@@ -1373,4 +1372,3 @@ extension UINavigationController: @retroactive UIGestureRecognizerDelegate {
     }
 }
 #endif
-
