@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 import CoreHaptics
-import PencilKit // Import PencilKit for Apple Pencil haptics support
+import PencilKit
 
 @main
 struct DionysusApp: App {
@@ -11,8 +11,6 @@ struct DionysusApp: App {
         }
     }
 }
-
-// MARK: - ViewModels
 
 @MainActor
 class HomeViewModel: ObservableObject {
@@ -27,7 +25,6 @@ class HomeViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         do {
-            // Removed the artificial 1.5-second delay to improve startup time.
             async let trendingMoviesFetch = APIService.shared.fetchMovies(from: "/trending/movie/week")
             async let popularMoviesFetch = APIService.shared.fetchMovies(from: "/movie/popular")
             async let trendingShowsFetch = APIService.shared.fetchTVShows(from: "/trending/tv/week")
@@ -159,8 +156,6 @@ class GenreViewModel: ObservableObject {
     }
 }
 
-// MARK: - Main Content Views
-
 struct ContentView: View {
     @StateObject private var homeViewModel = HomeViewModel()
 
@@ -274,8 +269,6 @@ struct MediaCarouselView: View {
     }
 }
 
-// MARK: - iPad Optimized Search View
-
 struct SearchView: View {
     @StateObject private var viewModel = SearchViewModel()
     @State private var selectedMediaItem: MediaItem?
@@ -301,15 +294,11 @@ struct SearchView: View {
     var body: some View {
         if isSplitView {
             NavigationSplitView {
-                // By wrapping the sidebar in its own NavigationStack, we create an unambiguous
-                // context for push navigation that is separate from the split view's master-detail behavior.
                 NavigationStack {
                     sidebarView
                         .navigationDestination(for: Genre.self) { genre in
                             GenreResultsView(genre: genre)
                         }
-                        // This destination now correctly handles pushes from within the sidebar's stack,
-                        // such as navigating from GenreResultsView to MediaDetailView.
                         .navigationDestination(for: MediaItem.self) { item in
                             MediaDetailView(media: item.underlyingMedia, showCustomDismissButton: true)
                         }
@@ -346,10 +335,7 @@ struct SearchView: View {
                 else if let errorMessage = viewModel.errorMessage { Text(errorMessage) }
                 else if viewModel.searchResults.isEmpty { ContentUnavailableView.search(text: viewModel.query) }
                 else {
-                    // The NavigationLink here correctly updates the `selectedMediaItem` to drive the detail view,
-                    // as it's not ambiguous anymore thanks to the explicit NavigationStack.
                     if isSplitView {
-                        // For iPad: Keep the selection binding to drive the detail view.
                         List(viewModel.searchResults, selection: $selectedMediaItem) { item in
                             NavigationLink(value: item) {
                                 SearchResultRow(media: item.underlyingMedia)
@@ -371,8 +357,7 @@ struct SearchView: View {
                         .listStyle(.plain)
                         .padding(.bottom, 80)
                     } else {
-                        // For iPhone: Remove the selection binding to allow push navigation.
-                        List(viewModel.searchResults) { item in // No selection parameter here
+                        List(viewModel.searchResults) { item in
                             NavigationLink(value: item) {
                                 SearchResultRow(media: item.underlyingMedia)
                                     .onDrag {
@@ -387,9 +372,6 @@ struct SearchView: View {
                                         MediaPosterView(media: item.underlyingMedia)
                                             .frame(width: 150, height: 225)
                                     }
-                                    // Note: The sensory feedback trigger won't activate here since
-                                    // selectedMediaItem is not used in the iPhone layout, but
-                                    // it doesn't harm anything to leave it.
                                     .sensoryFeedback(.impact(weight: .light), trigger: selectedMediaItem)
                             }
                         }
@@ -414,9 +396,6 @@ struct SearchView: View {
         }
     }
 }
-
-
-// MARK: - iPad Optimized Detail View
 
 struct MediaDetailView: View {
     let media: any Media
@@ -569,8 +548,6 @@ struct MediaDetailView: View {
     }
 }
 
-// MARK: - Renamed SourcesView (was LibraryActionSheetView)
-
 struct SourcesView: View {
     @StateObject private var viewModel = LibraryViewModel()
     let searchQuery: String
@@ -601,7 +578,6 @@ struct SourcesView: View {
     }
     var body: some View {
         ZStack {
-            // Removed the nested NavigationStack to prevent conflicts with NavigationSplitView.
             VStack {
                 VStack {
                     Picker("Quality", selection: $selectedQuality) { ForEach(qualityOptions, id: \.self) { Text($0) } }.pickerStyle(.segmented)
@@ -658,8 +634,6 @@ struct SourcesView: View {
     }
 }
 
-// MARK: - Reusable UI Components
-
 struct BlobBackgroundView: View {
     @State var animate = false
     let colors: [Color]
@@ -687,7 +661,6 @@ struct BlobBackgroundView: View {
         }
     }
 }
-
 
 struct DionysusTitleView: View {
     var body: some View {
@@ -1047,8 +1020,6 @@ struct HomeLoadingView: View {
     }
 }
 
-// MARK: - Helpers & Extensions
-
 struct Shimmer: ViewModifier {
     @State private var phase: CGFloat = -2.0
     func body(content: Content) -> some View {
@@ -1181,4 +1152,3 @@ extension UINavigationController: @retroactive UIGestureRecognizerDelegate {
     }
 }
 #endif
-
