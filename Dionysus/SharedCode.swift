@@ -83,8 +83,6 @@ struct TorrentResponse: Codable {
     let data: [Torrent]
 }
 
-// In SharedCode.swift
-
 struct Torrent: Codable, Identifiable, Hashable {
     var id: String { magnet ?? name }
     let name: String
@@ -105,16 +103,13 @@ struct Torrent: Codable, Identifiable, Hashable {
             self.provider = provider
         }
 
-    // Manually define the keys to match your JSON
     enum CodingKeys: String, CodingKey {
         case name, size, seeders, leechers, magnet, quality, provider
     }
 
-    // Custom initializer to handle flexible data types
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
-        // Decode standard properties normally
         name = try container.decode(String.self, forKey: .name)
         size = try container.decodeIfPresent(String.self, forKey: .size)
         magnet = try container.decodeIfPresent(String.self, forKey: .magnet)
@@ -122,10 +117,8 @@ struct Torrent: Codable, Identifiable, Hashable {
         provider = try container.decodeIfPresent(String.self, forKey: .provider)
 
         do {
-            // First, try to decode it as a String
             seeders = try container.decodeIfPresent(String.self, forKey: .seeders)
         } catch {
-            // If that fails, try to decode it as an Int and convert it to a String
             if let intValue = try? container.decodeIfPresent(Int.self, forKey: .seeders) {
                 seeders = String(intValue)
             } else {
@@ -133,12 +126,9 @@ struct Torrent: Codable, Identifiable, Hashable {
             }
         }
 
-        // Special handling for 'leechers'
         do {
-            // First, try to decode it as a String
             leechers = try container.decodeIfPresent(String.self, forKey: .leechers)
         } catch {
-            // If that fails, try to decode it as an Int and convert it to a String
             if let intValue = try? container.decodeIfPresent(Int.self, forKey: .leechers) {
                 leechers = String(intValue)
             } else {
@@ -147,7 +137,6 @@ struct Torrent: Codable, Identifiable, Hashable {
         }
     }
     
-    // Your existing computed properties remain unchanged
     var infoHash: String? {
         guard let magnet = magnet,
               let range = magnet.range(of: "urn:btih:") else { return nil }

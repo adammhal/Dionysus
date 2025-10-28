@@ -1,10 +1,3 @@
-//
-//  Item.swift
-//  Dionysus
-//
-//  Created by Adam Mhal on 7/24/25.
-//
-
 import Foundation
 import SwiftData
 
