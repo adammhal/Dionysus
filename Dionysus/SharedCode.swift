@@ -342,11 +342,13 @@ class APIService {
             urlString += "&force_refresh=true"
         }
 
+        print("🔍 [API] Searching torrents: \(urlString)")
         let url = URL(string: urlString)!
 
         let (data, response) = try await URLSession.shared.data(from: url)
 
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            print("❌ [API] Torrent search failed. Status: \((response as? HTTPURLResponse)?.statusCode ?? 0)")
             throw URLError(.badServerResponse)
         }
         let decoder = JSONDecoder()
@@ -359,8 +361,15 @@ class APIService {
         let url = URL(string: "https://api.real-debrid.com/rest/1.0/torrents")!
         var request = URLRequest(url: url)
         request.setValue("Bearer \(SettingsManager.shared.realDebridApiKey)", forHTTPHeaderField: "Authorization")
+        
+        print("🔍 [API] Fetching user torrents from: \(url)")
+        
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            print("❌ [API] Fetch user torrents failed. Status: \((response as? HTTPURLResponse)?.statusCode ?? 0)")
+            if let body = String(data: data, encoding: .utf8) {
+                 print("❌ [API] Response Body: \(body)")
+            }
             throw URLError(.badServerResponse)
         }
         let userTorrents = try JSONDecoder().decode([RealDebridTorrent].self, from: data)
@@ -392,8 +401,11 @@ class APIService {
     }
 
     func addAndSelectTorrent(magnet: String) async throws {
+        print("🔄 [API] Starting Add & Select Torrent flow...")
         let addedTorrent = try await addMagnetToRealDebrid(magnet: magnet)
+        print("✅ [API] Magnet added successfully. Torrent ID: \(addedTorrent.id). Now selecting files...")
         try await selectTorrentFiles(torrentId: addedTorrent.id)
+        print("✅ [API] Files selected successfully.")
     }
 
     private func addMagnetToRealDebrid(magnet: String) async throws -> RealDebridAddTorrentResponse {
@@ -402,12 +414,26 @@ class APIService {
         request.httpMethod = "POST"
         request.setValue("Bearer \(SettingsManager.shared.realDebridApiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        request.httpBody = "magnet=\(magnet.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")".data(using: .utf8)
+        
+        // FIX: Use custom .urlQueryValueAllowed to ensure '&' and '=' inside the magnet are encoded.
+        // Otherwise, the server sees the magnet link cut off at the first '&'.
+        let safeMagnet = magnet.addingPercentEncoding(withAllowedCharacters: .urlQueryValueAllowed) ?? ""
+        request.httpBody = "magnet=\(safeMagnet)".data(using: .utf8)
 
+        print("📡 [RD-API] Adding Magnet...")
+        
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 201 else {
-            throw URLError(.badServerResponse)
+        
+        if let httpResponse = response as? HTTPURLResponse {
+            print("📡 [RD-API] Add Magnet Response Code: \(httpResponse.statusCode)")
+            if httpResponse.statusCode != 201 {
+                 if let body = String(data: data, encoding: .utf8) {
+                     print("❌ [RD-API] Error Body: \(body)")
+                 }
+                throw URLError(.badServerResponse)
+            }
         }
+        
         return try JSONDecoder().decode(RealDebridAddTorrentResponse.self, from: data)
     }
 
@@ -419,9 +445,18 @@ class APIService {
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.httpBody = "files=all".data(using: .utf8)
 
-        let (_, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 204 else {
-            throw URLError(.badServerResponse)
+        print("📡 [RD-API] Selecting all files for torrent: \(torrentId)")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        if let httpResponse = response as? HTTPURLResponse {
+            print("📡 [RD-API] Select Files Response Code: \(httpResponse.statusCode)")
+            if httpResponse.statusCode != 204 {
+                if let body = String(data: data, encoding: .utf8) {
+                     print("❌ [RD-API] Select Files Error: \(body)")
+                 }
+                throw URLError(.badServerResponse)
+            }
         }
     }
 
@@ -572,6 +607,18 @@ extension Color {
     }
 }
 
+// Add this extension to define the stricter character set
+extension CharacterSet {
+    static let urlQueryValueAllowed: CharacterSet = {
+        let generalDelimitersToEncode = ":#[]@"
+        let subDelimitersToEncode = "!$&'()*+,;="
+        
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "\(generalDelimitersToEncode)\(subDelimitersToEncode)")
+        return allowed
+    }()
+}
+
 struct ImagesResponse: Codable {
     let logos: [Logo]
 }
@@ -619,4 +666,3 @@ struct WatchProviderDetail: Codable, Identifiable, Hashable {
         case displayPriority = "display_priority"
     }
 }
-

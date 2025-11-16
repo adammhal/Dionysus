@@ -105,6 +105,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Secrets.swift,
+				SettingsManager.swift,
 				SharedCode.swift,
 			);
 			target = F08240082E3BE68D0070A0C2 /* DionysusTopShelf */;
@@ -120,6 +121,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Secrets.swift,
+				SettingsManager.swift,
 				SharedCode.swift,
 			);
 			target = F085E5812E35490900C84043 /* DionysusTV */;

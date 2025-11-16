@@ -36,7 +36,7 @@ class DeepLinkManager: ObservableObject {
                 navigationPath.append(mediaItem)
                 
             } catch {
-                
+                print("Deep link error: \(error)")
             }
         }
     }
@@ -82,6 +82,7 @@ class HomeViewModel: ObservableObject {
 
         } catch {
             self.errorMessage = "Failed to load content."
+            print("Home Content Load Error: \(error)")
         }
         isLoading = false
     }
@@ -105,6 +106,7 @@ class SearchViewModel: ObservableObject {
             searchResults = try await APIService.shared.searchAll(query: query)
         } catch {
             self.errorMessage = "Search failed."
+            print("Search Error: \(error)")
         }
         isLoading = false
     }
@@ -125,27 +127,33 @@ class LibraryViewModel: ObservableObject {
     func fetchTorrents(for query: String, forceRefresh: Bool = false) async {
         isLoading = true
         errorMessage = nil
+        print("🔎 [LibraryVM] Fetching torrents for query: '\(query)' (Force Refresh: \(forceRefresh))")
         do {
             async let searchResult = APIService.shared.searchTorrents(query: query, forceRefresh: forceRefresh)
             async let hashesResult = APIService.shared.fetchUserTorrentHashes()
             let (fetchedTorrents, fetchedHashes) = try await (searchResult, hashesResult)
             self.torrents = fetchedTorrents
             self.existingTorrentHashes = fetchedHashes
+            print("✅ [LibraryVM] Fetched \(fetchedTorrents.count) torrents. Existing hashes: \(fetchedHashes.count)")
         } catch {
             self.errorMessage = "Failed to fetch sources."
+            print("❌ [LibraryVM] Fetch Error: \(error)")
         }
         isLoading = false
     }
     
     func addTorrent(magnet: String) async {
+        print("🚀 [LibraryVM] Requesting add for magnet: \(magnet.prefix(30))...")
         addState = .loading
         do {
             try await APIService.shared.addAndSelectTorrent(magnet: magnet)
             addState = .success
+            print("✨ [LibraryVM] Torrent added successfully!")
             if let newHash = Torrent(name: "", size: nil, seeders: nil, leechers: nil, magnet: magnet, quality: nil, provider: nil).infoHash {
                 existingTorrentHashes.insert(newHash)
             }
         } catch {
+            print("💥 [LibraryVM] FAILED to add torrent: \(error.localizedDescription)")
             addState = .error
         }
     }
@@ -166,7 +174,7 @@ class TVDetailViewModel: ObservableObject {
                 await fetchSeason(tvShowId: showId, seasonNumber: firstSeason.seasonNumber)
             }
         } catch {
-            
+            print("TV Details Fetch Error: \(error)")
         }
         isLoadingDetails = false
     }
@@ -176,7 +184,7 @@ class TVDetailViewModel: ObservableObject {
         do {
             selectedSeasonDetails = try await APIService.shared.fetchSeasonDetails(tvShowId: tvShowId, seasonNumber: seasonNumber)
         } catch {
-            
+            print("TV Season Fetch Error: \(error)")
         }
         isLoadingSeason = false
     }
@@ -192,7 +200,7 @@ class GenreViewModel: ObservableObject {
         do {
             media = try await APIService.shared.fetchDiscoverMedia(genreId: genreId)
         } catch {
-            
+            print("Genre Load Error: \(error)")
         }
         isLoading = false
     }
@@ -538,6 +546,7 @@ struct SourcesView: View {
                             ForEach(filteredTorrents) { torrent in
                                 let isAdded = torrent.infoHash.flatMap { viewModel.existingTorrentHashes.contains($0) } ?? false
                                 TorrentRowView(torrent: torrent, isAlreadyAdded: isAdded) { magnet in
+                                    print("🔘 [View] Add button tapped for torrent: \(torrent.name)")
                                     Task { await viewModel.addTorrent(magnet: magnet) }
                                 }
                                 .buttonStyle(.card)
@@ -1018,4 +1027,3 @@ extension View {
         self.modifier(FocusChangeModifier(onFocusChange: action))
     }
 }
-
