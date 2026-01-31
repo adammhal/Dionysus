@@ -747,11 +747,13 @@ struct SourcesView: View {
     @State private var selectedAVQuality: AVQuality = .normal
     @State private var filterText: String = ""
     @State private var selectedProvider: String = "All"
+    @State private var queryInput: String = ""
+    @State private var lastSubmittedQuery: String = ""
 
     private let qualityOptions = ["All", "2160p", "1080p", "720p"]
 
     private var finalSearchQuery: String {
-        var query = searchQuery
+        var query = lastSubmittedQuery.isEmpty ? searchQuery : lastSubmittedQuery
         if let term = selectedAVQuality.queryTerm {
             query += " \(term)"
         }
@@ -770,6 +772,28 @@ struct SourcesView: View {
     var body: some View {
         ZStack {
             VStack {
+                HStack {
+                    TextField("Search...", text: $queryInput)
+                        .font(.custom("Eurostile-Regular", size: 16))
+                        .padding(8)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(10)
+                        .onSubmit {
+                            lastSubmittedQuery = queryInput
+                        }
+
+                    Button(action: {
+                        lastSubmittedQuery = queryInput
+                    }) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 20))
+                            .foregroundColor(.blue)
+                            .padding(.leading, 5)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.top)
+
                 VStack {
                     Picker("Quality", selection: $selectedQuality) { ForEach(qualityOptions, id: \.self) { Text($0) } }.pickerStyle(.segmented)
                         .padding(.top, 5)
@@ -817,6 +841,14 @@ struct SourcesView: View {
                 }
             }
             .task(id: finalSearchQuery) { await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: false) }
+            .onAppear {
+                queryInput = searchQuery
+                lastSubmittedQuery = searchQuery
+            }
+            .onChange(of: searchQuery) {
+                queryInput = searchQuery
+                lastSubmittedQuery = searchQuery
+            }
             .onChange(of: viewModel.addState) { if viewModel.addState == .success {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { viewModel.addState = .idle }
             }}

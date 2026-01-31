@@ -471,6 +471,8 @@ struct SourcesView: View {
         @State private var selectedQuality: String = "All"
         @State private var selectedAVQuality: AVQuality = .normal
         @State private var selectedProvider: String = "All"
+        @State private var queryInput: String = ""
+        @State private var lastSubmittedQuery: String = ""
         
         private let qualityOptions = ["All", "2160p", "1080p", "720p"]
         
@@ -479,7 +481,7 @@ struct SourcesView: View {
         }
         
         private var finalSearchQuery: String {
-            var query = searchQuery
+            var query = lastSubmittedQuery.isEmpty ? searchQuery : lastSubmittedQuery
         if let term = selectedAVQuality.queryTerm {
             query += " \(term)"
         }
@@ -512,6 +514,18 @@ struct SourcesView: View {
         ZStack {
             ScrollView {
                 VStack(spacing: 30) {
+                        HStack {
+                            TextField("Search...", text: $queryInput)
+                                .onSubmit {
+                                    lastSubmittedQuery = queryInput
+                                }
+                            Button(action: {
+                                lastSubmittedQuery = queryInput
+                            }) {
+                                Image(systemName: "magnifyingglass")
+                            }
+                        }
+
                         Button(action: {
                             Task { await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: true) }
                         }) {
@@ -558,7 +572,15 @@ struct SourcesView: View {
                 .padding(60)
             }
             .navigationTitle("Sources for \(searchQuery)")
-            .task { await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: false) }
+            .task(id: finalSearchQuery) { await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: false) }
+            .onAppear {
+                queryInput = searchQuery
+                lastSubmittedQuery = searchQuery
+            }
+            .onChange(of: searchQuery) {
+                queryInput = searchQuery
+                lastSubmittedQuery = searchQuery
+            }
             .onChange(of: selectedAVQuality) { Task { await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: false) } }
             
             if viewModel.addState != .idle {
