@@ -1508,6 +1508,7 @@ struct TorrentFileInspectionView: View {
     private enum PreviewStatus { case idle, loading, ready, failed }
     @State private var previewStatus: PreviewStatus = .idle
     @State private var player: AVPlayer? = nil
+    @State private var showingPlayer = false
 
     var body: some View {
         NavigationStack {
@@ -1520,8 +1521,8 @@ struct TorrentFileInspectionView: View {
                                 previewStatus = .loading
                                 if let url = await onPreview() {
                                     player = AVPlayer(url: url)
-                                    player?.play()
                                     previewStatus = .ready
+                                    showingPlayer = true
                                 } else {
                                     previewStatus = .failed
                                 }
@@ -1539,11 +1540,11 @@ struct TorrentFileInspectionView: View {
                         }
                         .padding(.vertical, 4)
                     case .ready:
-                        if let player {
-                            VideoPlayer(player: player)
-                                .frame(height: 210)
-                                .cornerRadius(10)
-                                .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+                        Button {
+                            showingPlayer = true
+                        } label: {
+                            Label("Watch Preview", systemImage: "play.circle.fill")
+                                .font(.custom("Eurostile-Regular", size: 16))
                         }
                     case .failed:
                         Label("Could not load preview — torrent may still be downloading", systemImage: "exclamationmark.triangle")
@@ -1630,6 +1631,12 @@ struct TorrentFileInspectionView: View {
         }
         .preferredColorScheme(.dark)
         .onDisappear { player?.pause() }
+        .fullScreenCover(isPresented: $showingPlayer, onDismiss: { player?.pause() }) {
+            if let player {
+                FullScreenVideoPlayer(player: player)
+                    .ignoresSafeArea()
+            }
+        }
     }
 
     private func formatBytes(_ bytes: Int) -> String {
@@ -1639,6 +1646,21 @@ struct TorrentFileInspectionView: View {
         if mb >= 1 { return String(format: "%.2f MB", mb) }
         return "\(bytes) B"
     }
+}
+
+struct FullScreenVideoPlayer: UIViewControllerRepresentable {
+    let player: AVPlayer
+
+    func makeUIViewController(context: Context) -> AVPlayerViewController {
+        let vc = AVPlayerViewController()
+        vc.player = player
+        vc.showsPlaybackControls = true
+        vc.videoGravity = .resizeAspect
+        player.play()
+        return vc
+    }
+
+    func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {}
 }
 
 #if os(iOS)
