@@ -4,8 +4,22 @@ import CoreHaptics
 import PencilKit
 import AVKit
 
+class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication,
+                     supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        OrientationManager.shared.mask
+    }
+}
+
+final class OrientationManager {
+    static let shared = OrientationManager()
+    var mask: UIInterfaceOrientationMask = .portrait
+}
+
 @main
 struct DionysusApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -91,9 +105,30 @@ class LibraryViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var addState: LoadingState = .idle
     @Published var existingTorrentHashes: Set<String> = []
-    @Published var pendingTorrentId: String? = nil
+    @Published var pendingTorrentId: String? = nil {
+        didSet {
+            if let id = pendingTorrentId {
+                UserDefaults.standard.set(id, forKey: "orphanedPendingTorrentId")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "orphanedPendingTorrentId")
+            }
+        }
+    }
     @Published var pendingTorrentInfo: RealDebridTorrentInfo? = nil
     private var hasSelectedFiles = false
+
+    enum PreviewStatus { case idle, loading, ready, failed }
+    @Published var previewStatus: PreviewStatus = .idle
+    @Published var previewPlayer: AVPlayer? = nil
+    @Published var previewSubtitles: [String] = []
+
+    init() {
+        // Clean up any torrent left pending from a previous session (e.g. force-kill)
+        if let orphanId = UserDefaults.standard.string(forKey: "orphanedPendingTorrentId") {
+            UserDefaults.standard.removeObject(forKey: "orphanedPendingTorrentId")
+            Task { try? await APIService.shared.deleteTorrent(id: orphanId) }
+        }
+    }
 
     func fetchTorrents(for query: String, forceRefresh: Bool = false) async {
         isLoading = true
@@ -146,23 +181,75 @@ class LibraryViewModel: ObservableObject {
         }
     }
 
-    func loadPreviewURL() async -> URL? {
-        guard let id = pendingTorrentId, let info = pendingTorrentInfo else { return nil }
+    func loadPreviewURL() async -> (url: URL?, embeddedSubtitles: [String]) {
+        guard let id = pendingTorrentId, let info = pendingTorrentInfo else { return (nil, []) }
         do {
             if !hasSelectedFiles {
                 try await APIService.shared.confirmTorrentSelection(id: id)
                 hasSelectedFiles = true
             }
             let downloaded = try await APIService.shared.pollUntilDownloaded(id: id)
-            // Pick the link for the largest non-subtitle file
-            let videoIndex = downloaded.files.enumerated()
-                .filter { !$0.element.isSubtitle && $0.element.bytes > 0 }
-                .max(by: { $0.element.bytes < $1.element.bytes })?.offset ?? 0
-            guard !downloaded.links.isEmpty else { return nil }
-            let link = downloaded.links[min(videoIndex, downloaded.links.count - 1)]
-            return try await APIService.shared.unrestrict(link: link)
+            // links[] maps 1:1 to selected files only — filter to selected before indexing
+            let selectedFiles = downloaded.files.filter { $0.selected == 1 }
+            print("[Preview] \(selectedFiles.count) selected files, \(downloaded.links.count) links")
+            // When RD packages files into a single archive, links.count won't match selectedFiles.count.
+            // In that case there's no per-file index we can trust, so just use links[0].
+            let link: String
+            if selectedFiles.count == downloaded.links.count {
+                let videoIndex = selectedFiles.enumerated()
+                    .filter { !$0.element.isSubtitle && $0.element.bytes > 0 }
+                    .max(by: { $0.element.bytes < $1.element.bytes })?.offset ?? 0
+                link = downloaded.links[videoIndex]
+            } else {
+                link = downloaded.links[0]
+            }
+            let unrestricted = try await APIService.shared.unrestrict(link: link)
+            guard unrestricted.isPlayable else {
+                print("[Preview] Not a video (\(unrestricted.mimeType)) — preview unavailable")
+                return (nil, [])
+            }
+            // RD download IDs are always 13 base chars + a 3-digit server-routing suffix
+            let baseId = String(unrestricted.id.prefix(13))
+            // Fetch media info — contains modelUrl for subtitle-aware HLS and subtitle track list
+            let mediaInfo = try? await APIService.shared.fetchMediaInfos(id: baseId)
+            let subtitles = mediaInfo?.subtitleLanguages ?? []
+            guard unrestricted.streamable == 1 else {
+                print("[Preview] Not streamable — preview unavailable")
+                return (nil, subtitles)
+            }
+            let playURL: URL?
+            if let modelUrl = mediaInfo?.modelUrl,
+               let engKey = mediaInfo?.subtitleTrackKeys.first(where: { $0.hasPrefix("eng") }) {
+                let hlsString = modelUrl
+                    .replacingOccurrences(of: "{audio}", with: "eng1")
+                    .replacingOccurrences(of: "{subtitles}", with: engKey)
+                    .replacingOccurrences(of: "{audioCodec}", with: "aac")
+                    .replacingOccurrences(of: "{quality}", with: "full")
+                    .replacingOccurrences(of: "{format}", with: "m3u8")
+                print("[Preview] Subtitle-aware HLS: \(hlsString)")
+                playURL = URL(string: hlsString)
+            } else if let streamURL = try? await APIService.shared.fetchStreamURL(id: baseId) {
+                playURL = streamURL
+            } else {
+                print("[Preview] Transcode unavailable — preview unavailable")
+                playURL = nil
+            }
+            return (playURL, subtitles)
         } catch {
-            return nil
+            print("[Preview] Error: \(error)")
+            return (nil, [])
+        }
+    }
+
+    func loadPreview() async {
+        previewStatus = .loading
+        let result = await loadPreviewURL()
+        previewSubtitles = result.embeddedSubtitles
+        if let url = result.url {
+            previewPlayer = AVPlayer(url: url)
+            previewStatus = .ready
+        } else {
+            previewStatus = .failed
         }
     }
 
@@ -172,6 +259,9 @@ class LibraryViewModel: ObservableObject {
         pendingTorrentId = nil
         pendingTorrentInfo = nil
         hasSelectedFiles = false
+        previewStatus = .idle
+        previewPlayer = nil
+        previewSubtitles = []
         addState = .loading
         do {
             if !alreadySelected {
@@ -190,6 +280,9 @@ class LibraryViewModel: ObservableObject {
         pendingTorrentId = nil
         pendingTorrentInfo = nil
         hasSelectedFiles = false
+        previewStatus = .idle
+        previewPlayer = nil
+        previewSubtitles = []
         try? await APIService.shared.deleteTorrent(id: id)
     }
 }
@@ -946,9 +1039,12 @@ struct SourcesView: View {
             }) { info in
                 TorrentFileInspectionView(
                     info: info,
+                    previewStatus: viewModel.previewStatus,
+                    previewPlayer: viewModel.previewPlayer,
+                    embeddedSubtitles: viewModel.previewSubtitles,
                     onConfirm: { Task { await viewModel.confirmTorrent() } },
                     onCancel: { Task { await viewModel.cancelPendingTorrent() } },
-                    onPreview: { await viewModel.loadPreviewURL() }
+                    onLoadPreview: { Task { await viewModel.loadPreview() } }
                 )
                 .presentationDetents([.large])
             }
@@ -1495,83 +1591,122 @@ extension String: @retroactive Identifiable {
 
 struct TorrentFileInspectionView: View {
     let info: RealDebridTorrentInfo
+    let previewStatus: LibraryViewModel.PreviewStatus
+    let previewPlayer: AVPlayer?
+    let embeddedSubtitles: [String]
     let onConfirm: () -> Void
     let onCancel: () -> Void
-    let onPreview: () async -> URL?
+    let onLoadPreview: () -> Void
 
     private var subtitleFiles: [RealDebridFile] { info.files.filter { $0.isSubtitle } }
     private var otherFiles: [RealDebridFile] { info.files.filter { !$0.isSubtitle } }
+    private var isRarPackaged: Bool { info.files.contains { $0.isRarRelated } }
     private var detectedLanguages: [String] {
         Array(Set(subtitleFiles.compactMap { $0.subtitleLanguage })).sorted()
     }
 
-    private enum PreviewStatus { case idle, loading, ready, failed }
-    @State private var previewStatus: PreviewStatus = .idle
-    @State private var player: AVPlayer? = nil
-    @State private var showingPlayer = false
-
     var body: some View {
         NavigationStack {
             List {
+                if isRarPackaged {
+                    Section {
+                        HStack(alignment: .top, spacing: 12) {
+                            Image(systemName: "archivebox.fill")
+                                .foregroundColor(.orange)
+                                .font(.title3)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("RAR Archive Detected")
+                                    .font(.custom("Eurostile-Regular", size: 14))
+                                    .foregroundColor(.orange)
+                                Text("This torrent is packaged as a RAR archive. Infuse cannot open RAR files - preview and playback will not work.")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+
                 Section("Preview") {
                     switch previewStatus {
                     case .idle:
                         Button {
-                            Task {
-                                previewStatus = .loading
-                                if let url = await onPreview() {
-                                    player = AVPlayer(url: url)
-                                    previewStatus = .ready
-                                    showingPlayer = true
-                                } else {
-                                    previewStatus = .failed
-                                }
-                            }
+                            onLoadPreview()
                         } label: {
-                            Label("Load Preview", systemImage: "play.circle.fill")
+                            Label("Load Preview & Subtitle Info", systemImage: "play.circle.fill")
                                 .font(.custom("Eurostile-Regular", size: 16))
                         }
                     case .loading:
                         HStack(spacing: 12) {
                             ProgressView().scaleEffect(0.85)
-                            Text("Preparing preview — this may take a moment...")
+                            Text("Preparing preview - this may take a moment...")
                                 .font(.custom("Eurostile-Regular", size: 14))
                                 .foregroundColor(.secondary)
                         }
                         .padding(.vertical, 4)
                     case .ready:
-                        Button {
-                            showingPlayer = true
-                        } label: {
-                            Label("Watch Preview", systemImage: "play.circle.fill")
-                                .font(.custom("Eurostile-Regular", size: 16))
+                        if let player = previewPlayer {
+                            AZVideoPlayer(
+                                player: player,
+                                willBeginFullScreenPresentationWithAnimationCoordinator: { _, _ in
+                                    OrientationManager.shared.mask = .all
+                                },
+                                willEndFullScreenPresentationWithAnimationCoordinator: { _, coordinator in
+                                    OrientationManager.shared.mask = .portrait
+                                    coordinator.animate(alongsideTransition: nil) { _ in
+                                        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+                                            scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
+                                        }
+                                    }
+                                },
+                                entersFullScreenWhenPlaybackBegins: true,
+                                pausesWhenFullScreenPlaybackEnds: false
+                            )
+                            .frame(height: 200)
+                            .cornerRadius(10)
+                            .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
                         }
                     case .failed:
-                        Label("Could not load preview — torrent may still be downloading", systemImage: "exclamationmark.triangle")
-                            .font(.custom("Eurostile-Regular", size: 13))
-                            .foregroundColor(.orange)
+                        Label(
+                            isRarPackaged
+                                ? "Preview unavailable — content is inside a RAR archive"
+                                : "Could not load preview — torrent may still be downloading",
+                            systemImage: "exclamationmark.triangle"
+                        )
+                        .font(.custom("Eurostile-Regular", size: 13))
+                        .foregroundColor(.orange)
                     }
                 }
 
                 Section {
-                    if subtitleFiles.isEmpty {
+                    let hasExternal = !subtitleFiles.isEmpty
+                    let hasEmbedded = !embeddedSubtitles.isEmpty
+                    if !hasExternal && !hasEmbedded {
                         Label("No subtitles found in this torrent", systemImage: "captions.bubble")
                             .foregroundColor(.secondary)
                     } else {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Label("Subtitles detected", systemImage: "captions.bubble.fill")
-                                .foregroundColor(.green)
-                            if !detectedLanguages.isEmpty {
-                                Text(detectedLanguages.joined(separator: " • "))
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            } else {
-                                Text("\(subtitleFiles.count) subtitle file(s) — language unknown")
+                        if hasExternal {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Label("External subtitle files", systemImage: "captions.bubble.fill")
+                                    .foregroundColor(.green)
+                                Text(detectedLanguages.isEmpty
+                                     ? "\(subtitleFiles.count) file(s) — language unknown"
+                                     : detectedLanguages.joined(separator: " • "))
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                             }
+                            .padding(.vertical, 2)
                         }
-                        .padding(.vertical, 4)
+                        if hasEmbedded {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Label("Embedded subtitle tracks", systemImage: "captions.bubble.fill")
+                                    .foregroundColor(.green)
+                                Text(embeddedSubtitles.joined(separator: " • "))
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 2)
+                        }
                     }
                 } header: {
                     Text("Subtitles")
@@ -1601,8 +1736,8 @@ struct TorrentFileInspectionView: View {
                 Section("Video & Other Files") {
                     ForEach(otherFiles) { file in
                         HStack(spacing: 10) {
-                            Image(systemName: "doc.fill")
-                                .foregroundColor(.secondary)
+                            Image(systemName: fileIcon(for: file))
+                                .foregroundColor(fileIconColor(for: file))
                                 .frame(width: 20)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(URL(fileURLWithPath: file.path).lastPathComponent)
@@ -1630,13 +1765,22 @@ struct TorrentFileInspectionView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .onDisappear { player?.pause() }
-        .fullScreenCover(isPresented: $showingPlayer, onDismiss: { player?.pause() }) {
-            if let player {
-                FullScreenVideoPlayer(player: player)
-                    .ignoresSafeArea()
-            }
-        }
+        .onDisappear { previewPlayer?.pause() }
+    }
+
+    private func fileIcon(for file: RealDebridFile) -> String {
+        let lower = file.path.lowercased()
+        if lower.hasSuffix(".mkv") || lower.hasSuffix(".mp4") || lower.hasSuffix(".avi") { return "film.fill" }
+        if lower.hasSuffix(".rar") || lower.hasSuffix(".sfv") { return "archivebox.fill" }
+        if lower.hasSuffix(".nfo") { return "info.circle.fill" }
+        return "doc.fill"
+    }
+
+    private func fileIconColor(for file: RealDebridFile) -> Color {
+        let lower = file.path.lowercased()
+        if lower.hasSuffix(".mkv") || lower.hasSuffix(".mp4") || lower.hasSuffix(".avi") { return .blue }
+        if lower.hasSuffix(".rar") || lower.hasSuffix(".sfv") { return .orange }
+        return .secondary
     }
 
     private func formatBytes(_ bytes: Int) -> String {
@@ -1648,19 +1792,92 @@ struct TorrentFileInspectionView: View {
     }
 }
 
-struct FullScreenVideoPlayer: UIViewControllerRepresentable {
-    let player: AVPlayer
+// MARK: - AZVideoPlayer (adapted from github.com/adamzarn/AZVideoPlayer)
 
-    func makeUIViewController(context: Context) -> AVPlayerViewController {
-        let vc = AVPlayerViewController()
-        vc.player = player
-        vc.showsPlaybackControls = true
-        vc.videoGravity = .resizeAspect
-        player.play()
-        return vc
+struct AZVideoPlayer: UIViewControllerRepresentable {
+    typealias TransitionCompletion = (AVPlayerViewController, UIViewControllerTransitionCoordinator) -> Void
+
+    let player: AVPlayer?
+    let controller = AVPlayerViewController()
+    let willBeginFullScreenPresentationWithAnimationCoordinator: TransitionCompletion?
+    let willEndFullScreenPresentationWithAnimationCoordinator: TransitionCompletion?
+    let showsPlaybackControls: Bool
+    let entersFullScreenWhenPlaybackBegins: Bool
+    let pausesWhenFullScreenPlaybackEnds: Bool
+
+    init(player: AVPlayer?,
+         willBeginFullScreenPresentationWithAnimationCoordinator: TransitionCompletion? = nil,
+         willEndFullScreenPresentationWithAnimationCoordinator: TransitionCompletion? = nil,
+         showsPlaybackControls: Bool = true,
+         entersFullScreenWhenPlaybackBegins: Bool = false,
+         pausesWhenFullScreenPlaybackEnds: Bool = false) {
+        self.player = player
+        self.willBeginFullScreenPresentationWithAnimationCoordinator = willBeginFullScreenPresentationWithAnimationCoordinator
+        self.willEndFullScreenPresentationWithAnimationCoordinator = willEndFullScreenPresentationWithAnimationCoordinator
+        self.showsPlaybackControls = showsPlaybackControls
+        self.entersFullScreenWhenPlaybackBegins = entersFullScreenWhenPlaybackBegins
+        self.pausesWhenFullScreenPlaybackEnds = pausesWhenFullScreenPlaybackEnds
     }
 
-    func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {}
+    func makeUIViewController(context: Context) -> AVPlayerViewController {
+        controller.player = player
+        controller.showsPlaybackControls = showsPlaybackControls
+        controller.entersFullScreenWhenPlaybackBegins = entersFullScreenWhenPlaybackBegins
+        controller.videoGravity = .resizeAspect
+        controller.delegate = context.coordinator
+        return controller
+    }
+
+    func updateUIViewController(_ controller: AVPlayerViewController, context: Context) {
+        controller.player = player
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    final class Coordinator: NSObject, AVPlayerViewControllerDelegate {
+        var parent: AZVideoPlayer
+        var timeControlStatusObservation: NSKeyValueObservation?
+        var shouldEnterFullScreenOnNextPlay = true
+
+        init(_ parent: AZVideoPlayer) {
+            self.parent = parent
+            super.init()
+            timeControlStatusObservation = parent.player?.observe(\.timeControlStatus) { [weak self] player, _ in
+                guard let self else { return }
+                if player.timeControlStatus == .playing && self.shouldEnterFullScreenOnNextPlay
+                    && self.parent.entersFullScreenWhenPlaybackBegins {
+                    self.parent.controller.enterFullScreen(animated: true)
+                } else if player.timeControlStatus == .playing {
+                    self.shouldEnterFullScreenOnNextPlay = true
+                }
+            }
+        }
+
+        func playerViewController(_ playerViewController: AVPlayerViewController,
+                                  willBeginFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
+            parent.willBeginFullScreenPresentationWithAnimationCoordinator?(playerViewController, coordinator)
+        }
+
+        func playerViewController(_ playerViewController: AVPlayerViewController,
+                                  willEndFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
+            if !parent.pausesWhenFullScreenPlaybackEnds {
+                let isPlaying = parent.player?.timeControlStatus == .playing
+                coordinator.animate(alongsideTransition: nil) { _ in
+                    if isPlaying {
+                        self.shouldEnterFullScreenOnNextPlay = false
+                        self.parent.player?.play()
+                    }
+                }
+            }
+            parent.willEndFullScreenPresentationWithAnimationCoordinator?(playerViewController, coordinator)
+        }
+    }
+}
+
+extension AVPlayerViewController {
+    func enterFullScreen(animated: Bool) {
+        perform(NSSelectorFromString("enterFullScreenAnimated:completionHandler:"), with: animated, with: nil)
+    }
 }
 
 #if os(iOS)

@@ -267,6 +267,16 @@ extension RealDebridFile {
         return RealDebridFile.subtitleExtensions.contains { lower.hasSuffix($0) }
     }
 
+    var isRarRelated: Bool {
+        let lower = path.lowercased()
+        // Only flag actual archive files — .nfo/.sfv appear in non-RAR scene releases too
+        if lower.hasSuffix(".rar") { return true }
+        // Match .r00–.r99 multi-part RAR extensions
+        let ext = (lower as NSString).pathExtension
+        if ext.count == 3, ext.hasPrefix("r"), ext.dropFirst().allSatisfy(\.isNumber) { return true }
+        return false
+    }
+
     var subtitleLanguage: String? {
         guard isSubtitle else { return nil }
         let base = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent.lowercased()
@@ -300,7 +310,47 @@ struct RealDebridTorrentInfo: Codable, Identifiable {
 }
 
 struct RealDebridUnrestrictResponse: Codable {
+    let id: String
+    let filename: String
+    let mimeType: String
     let download: String
+    let streamable: Int
+
+    var isPlayable: Bool { mimeType.hasPrefix("video/") }
+}
+
+struct RealDebridSubtitleTrack: Codable {
+    let lang: String?
+    let lang_iso: String?
+}
+
+struct RealDebridMediaDetails: Codable {
+    let subtitles: [String: RealDebridSubtitleTrack]?
+}
+
+struct RealDebridMediaInfosResponse: Codable {
+    let details: RealDebridMediaDetails
+    let modelUrl: String?
+
+    var subtitleLanguages: [String] {
+        guard let subs = details.subtitles else { return [] }
+        let langs = subs.values
+            .compactMap { $0.lang }
+            .filter { !$0.isEmpty && $0 != "Unknown" }
+        return Array(Set(langs)).sorted()
+    }
+
+    // subtitle track keys from the response (e.g. "eng1", "fre1") sorted by key
+    var subtitleTrackKeys: [String] {
+        details.subtitles?.keys.sorted() ?? []
+    }
+}
+
+struct RealDebridTranscodeResponse: Codable {
+    struct AppleStreams: Codable {
+        let full: String
+    }
+    let apple: AppleStreams
 }
 
 enum APIError: LocalizedError {
@@ -609,7 +659,7 @@ class APIService {
         throw APIError.serverError(service: "Real-Debrid", statusCode: 408)
     }
 
-    func unrestrict(link: String) async throws -> URL {
+    func unrestrict(link: String) async throws -> RealDebridUnrestrictResponse {
         let url = URL(string: "https://api.real-debrid.com/rest/1.0/unrestrict/link")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -625,11 +675,38 @@ class APIService {
         if httpResponse.statusCode != 200 {
             throw APIError.from(httpResponse: httpResponse, data: data, service: "Real-Debrid")
         }
-        let result = try JSONDecoder().decode(RealDebridUnrestrictResponse.self, from: data)
-        guard let downloadURL = URL(string: result.download) else {
-            throw APIError.decodingFailed(type: "RealDebridUnrestrictResponse")
+        print("[Unrestrict] Raw JSON: \(String(data: data, encoding: .utf8) ?? "<binary>")")
+        return try JSONDecoder().decode(RealDebridUnrestrictResponse.self, from: data)
+    }
+
+    func fetchStreamURL(id: String) async throws -> URL {
+        let url = URL(string: "https://api.real-debrid.com/rest/1.0/streaming/transcode/\(id)")!
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(SettingsManager.shared.realDebridApiKey)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+        print("[Transcode] Status: \(statusCode), body: \(String(data: data, encoding: .utf8) ?? "<binary>")")
+        guard statusCode == 200 else {
+            throw APIError.invalidResponse(service: "Real-Debrid")
         }
-        return downloadURL
+        let result = try JSONDecoder().decode(RealDebridTranscodeResponse.self, from: data)
+        guard let streamURL = URL(string: result.apple.full) else {
+            throw APIError.decodingFailed(type: "RealDebridTranscodeResponse")
+        }
+        return streamURL
+    }
+
+    func fetchMediaInfos(id: String) async throws -> RealDebridMediaInfosResponse {
+        let url = URL(string: "https://api.real-debrid.com/rest/1.0/streaming/mediaInfos/\(id)")!
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(SettingsManager.shared.realDebridApiKey)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+        print("[MediaInfos] Status: \(statusCode), body: \(String(data: data, encoding: .utf8) ?? "<binary>")")
+        guard statusCode == 200 else {
+            throw APIError.invalidResponse(service: "Real-Debrid")
+        }
+        return try JSONDecoder().decode(RealDebridMediaInfosResponse.self, from: data)
     }
 
     func fetchMovie(id: Int) async throws -> Movie {
