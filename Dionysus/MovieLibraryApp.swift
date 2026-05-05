@@ -8,6 +8,9 @@ struct DionysusApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .task {
+                    await APIService.shared.pingServer()
+                }
         }
     }
 }
@@ -83,24 +86,46 @@ enum WatchStatus {
 class LibraryViewModel: ObservableObject {
     @Published var torrents: [Torrent] = []
     @Published var isLoading = false
+    @Published var isWakingServer = false
     @Published var errorMessage: String?
     @Published var addState: LoadingState = .idle
     @Published var existingTorrentHashes: Set<String> = []
 
     func fetchTorrents(for query: String, forceRefresh: Bool = false) async {
         isLoading = true
+        isWakingServer = false
         errorMessage = nil
-        do {
-            async let searchResult = APIService.shared.searchTorrents(query: query, forceRefresh: forceRefresh)
-            async let hashesResult = APIService.shared.fetchUserTorrentHashes()
-            let (fetchedTorrents, fetchedHashes) = try await (searchResult, hashesResult)
-            self.torrents = fetchedTorrents
-            self.existingTorrentHashes = fetchedHashes
-            HapticManager.shared.success()
-        } catch let apiError as APIError {
+
+        let retryDelays: [UInt64] = [2_000_000_000, 4_000_000_000, 8_000_000_000]
+        var lastError: Error?
+
+        for attempt in 0..<(retryDelays.count + 1) {
+            if attempt > 0 {
+                isWakingServer = true
+                try? await Task.sleep(nanoseconds: retryDelays[attempt - 1])
+            }
+            do {
+                async let searchResult = APIService.shared.searchTorrents(query: query, forceRefresh: forceRefresh)
+                async let hashesResult = APIService.shared.fetchUserTorrentHashes()
+                let (fetchedTorrents, fetchedHashes) = try await (searchResult, hashesResult)
+                self.torrents = fetchedTorrents
+                self.existingTorrentHashes = fetchedHashes
+                isWakingServer = false
+                HapticManager.shared.success()
+                isLoading = false
+                return
+            } catch {
+                lastError = error
+            }
+        }
+
+        isWakingServer = false
+        if let apiError = lastError as? APIError {
             self.errorMessage = apiError.localizedDescription
-        } catch {
+        } else if let error = lastError {
             self.errorMessage = "Failed to fetch sources: \(error.localizedDescription)"
+        } else {
+            self.errorMessage = "Failed to fetch sources."
         }
         isLoading = false
     }
@@ -816,7 +841,17 @@ struct SourcesView: View {
                 .padding(.top)
 
                 Group {
-                    if viewModel.isLoading { ProgressView() }
+                    if viewModel.isLoading {
+                        VStack(spacing: 12) {
+                            ProgressView()
+                            if viewModel.isWakingServer {
+                                Text("Waking up server...")
+                                    .font(.custom("Eurostile-Regular", size: 14))
+                                    .foregroundColor(.secondary)
+                                    .transition(.opacity.animation(.easeIn))
+                            }
+                        }
+                    }
                     else if let errorMessage = viewModel.errorMessage { ErrorView(message: errorMessage) { Task { await viewModel.fetchTorrents(for: finalSearchQuery) } } }
                     else if filteredTorrents.isEmpty { ContentUnavailableView("No Sources Found", systemImage: "magnifyingglass") }
                     else {

@@ -626,6 +626,13 @@ class APIService {
         }
     }
 
+    func pingServer() async {
+        guard let url = URL(string: "\(dionysusServerBaseURL)/health") else { return }
+        let request = URLRequest(url: url, timeoutInterval: 30)
+        _ = try? await URLSession.shared.data(for: request)
+        print("🏓 [API] Server ping complete")
+    }
+
     func fetchWatchProviders(for media: any Media) async throws -> WatchProviderCountryResult? {
         let mediaType = media is Movie ? "movie" : "tv"
         let url = URL(string: "\(baseUrl)/\(mediaType)/\(media.id)/watch/providers?api_key=\(SettingsManager.shared.tmdbApiKey)")!
