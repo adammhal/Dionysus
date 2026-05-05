@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 import CoreHaptics
 import PencilKit
+import AVKit
 
 @main
 struct DionysusApp: App {
@@ -92,6 +93,7 @@ class LibraryViewModel: ObservableObject {
     @Published var existingTorrentHashes: Set<String> = []
     @Published var pendingTorrentId: String? = nil
     @Published var pendingTorrentInfo: RealDebridTorrentInfo? = nil
+    private var hasSelectedFiles = false
 
     func fetchTorrents(for query: String, forceRefresh: Bool = false) async {
         isLoading = true
@@ -144,13 +146,37 @@ class LibraryViewModel: ObservableObject {
         }
     }
 
+    func loadPreviewURL() async -> URL? {
+        guard let id = pendingTorrentId, let info = pendingTorrentInfo else { return nil }
+        do {
+            if !hasSelectedFiles {
+                try await APIService.shared.confirmTorrentSelection(id: id)
+                hasSelectedFiles = true
+            }
+            let downloaded = try await APIService.shared.pollUntilDownloaded(id: id)
+            // Pick the link for the largest non-subtitle file
+            let videoIndex = downloaded.files.enumerated()
+                .filter { !$0.element.isSubtitle && $0.element.bytes > 0 }
+                .max(by: { $0.element.bytes < $1.element.bytes })?.offset ?? 0
+            guard !downloaded.links.isEmpty else { return nil }
+            let link = downloaded.links[min(videoIndex, downloaded.links.count - 1)]
+            return try await APIService.shared.unrestrict(link: link)
+        } catch {
+            return nil
+        }
+    }
+
     func confirmTorrent() async {
         guard let id = pendingTorrentId, let info = pendingTorrentInfo else { return }
+        let alreadySelected = hasSelectedFiles
         pendingTorrentId = nil
         pendingTorrentInfo = nil
+        hasSelectedFiles = false
         addState = .loading
         do {
-            try await APIService.shared.confirmTorrentSelection(id: id)
+            if !alreadySelected {
+                try await APIService.shared.confirmTorrentSelection(id: id)
+            }
             existingTorrentHashes.insert(info.hash.lowercased())
             addState = .success
             HapticManager.shared.success()
@@ -163,6 +189,7 @@ class LibraryViewModel: ObservableObject {
         guard let id = pendingTorrentId else { return }
         pendingTorrentId = nil
         pendingTorrentInfo = nil
+        hasSelectedFiles = false
         try? await APIService.shared.deleteTorrent(id: id)
     }
 }
@@ -915,12 +942,13 @@ struct SourcesView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { viewModel.addState = .idle }
             }}
             .sheet(item: $viewModel.pendingTorrentInfo) { info in
-                TorrentFileInspectionView(info: info) {
-                    Task { await viewModel.confirmTorrent() }
-                } onCancel: {
-                    Task { await viewModel.cancelPendingTorrent() }
-                }
-                .presentationDetents([.medium, .large])
+                TorrentFileInspectionView(
+                    info: info,
+                    onConfirm: { Task { await viewModel.confirmTorrent() } },
+                    onCancel: { Task { await viewModel.cancelPendingTorrent() } },
+                    onPreview: { await viewModel.loadPreviewURL() }
+                )
+                .presentationDetents([.large])
             }
             if viewModel.addState != .idle { StatusOverlayView(addState: $viewModel.addState) }
         }
@@ -1467,6 +1495,7 @@ struct TorrentFileInspectionView: View {
     let info: RealDebridTorrentInfo
     let onConfirm: () -> Void
     let onCancel: () -> Void
+    let onPreview: () async -> URL?
 
     private var subtitleFiles: [RealDebridFile] { info.files.filter { $0.isSubtitle } }
     private var otherFiles: [RealDebridFile] { info.files.filter { !$0.isSubtitle } }
@@ -1474,9 +1503,53 @@ struct TorrentFileInspectionView: View {
         Array(Set(subtitleFiles.compactMap { $0.subtitleLanguage })).sorted()
     }
 
+    private enum PreviewStatus { case idle, loading, ready, failed }
+    @State private var previewStatus: PreviewStatus = .idle
+    @State private var player: AVPlayer? = nil
+
     var body: some View {
         NavigationStack {
             List {
+                Section("Preview") {
+                    switch previewStatus {
+                    case .idle:
+                        Button {
+                            Task {
+                                previewStatus = .loading
+                                if let url = await onPreview() {
+                                    player = AVPlayer(url: url)
+                                    player?.play()
+                                    previewStatus = .ready
+                                } else {
+                                    previewStatus = .failed
+                                }
+                            }
+                        } label: {
+                            Label("Load Preview", systemImage: "play.circle.fill")
+                                .font(.custom("Eurostile-Regular", size: 16))
+                        }
+                    case .loading:
+                        HStack(spacing: 12) {
+                            ProgressView().scaleEffect(0.85)
+                            Text("Preparing preview — this may take a moment...")
+                                .font(.custom("Eurostile-Regular", size: 14))
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                    case .ready:
+                        if let player {
+                            VideoPlayer(player: player)
+                                .frame(height: 210)
+                                .cornerRadius(10)
+                                .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+                        }
+                    case .failed:
+                        Label("Could not load preview — torrent may still be downloading", systemImage: "exclamationmark.triangle")
+                            .font(.custom("Eurostile-Regular", size: 13))
+                            .foregroundColor(.orange)
+                    }
+                }
+
                 Section {
                     if subtitleFiles.isEmpty {
                         Label("No subtitles found in this torrent", systemImage: "captions.bubble")
@@ -1554,6 +1627,7 @@ struct TorrentFileInspectionView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .onDisappear { player?.pause() }
     }
 
     private func formatBytes(_ bytes: Int) -> String {
