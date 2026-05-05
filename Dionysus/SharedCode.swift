@@ -572,7 +572,7 @@ class APIService {
     func fetchTorrentInfo(id: String) async throws -> RealDebridTorrentInfo {
         let url = URL(string: "https://api.real-debrid.com/rest/1.0/torrents/info/\(id)")!
         var request = URLRequest(url: url)
-        request.setValue("Bearer \(Secrets.realDebridApiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(SettingsManager.shared.realDebridApiKey)", forHTTPHeaderField: "Authorization")
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
