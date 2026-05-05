@@ -264,6 +264,63 @@ struct RealDebridTorrentInfo: Codable {
     let files: [RealDebridFile]
 }
 
+enum APIError: LocalizedError {
+    case unauthorized(service: String)
+    case forbidden(service: String)
+    case notFound(endpoint: String)
+    case serverError(service: String, statusCode: Int)
+    case networkUnavailable
+    case decodingFailed(type: String)
+    case invalidResponse(service: String)
+    case rateLimited(service: String)
+    case unknown(statusCode: Int, body: String?)
+
+    var errorDescription: String? {
+        switch self {
+        case .unauthorized(let service):
+            return "\(service) API key is invalid or expired. Update it in Settings."
+        case .forbidden(let service):
+            return "Access denied by \(service). Check your account or API key."
+        case .notFound(let endpoint):
+            return "The requested resource was not found: \(endpoint)"
+        case .serverError(let service, let statusCode):
+            return "\(service) server error (HTTP \(statusCode)). Try again later."
+        case .networkUnavailable:
+            return "Network connection unavailable. Check your internet connection."
+        case .decodingFailed(let type):
+            return "Failed to parse \(type) response from server."
+        case .invalidResponse(let service):
+            return "Received an invalid response from \(service)."
+        case .rateLimited(let service):
+            return "Too many requests to \(service). Wait a moment and try again."
+        case .unknown(let statusCode, let body):
+            var message = "Request failed with HTTP \(statusCode)."
+            if let body = body, !body.isEmpty {
+                message += " Response: \(body)"
+            }
+            return message
+        }
+    }
+
+    static func from(httpResponse: HTTPURLResponse, data: Data, service: String) -> APIError {
+        let body = String(data: data, encoding: .utf8)
+        switch httpResponse.statusCode {
+        case 401:
+            return .unauthorized(service: service)
+        case 403:
+            return .forbidden(service: service)
+        case 404:
+            return .notFound(endpoint: httpResponse.url?.path ?? "unknown")
+        case 429:
+            return .rateLimited(service: service)
+        case 500...599:
+            return .serverError(service: service, statusCode: httpResponse.statusCode)
+        default:
+            return .unknown(statusCode: httpResponse.statusCode, body: body)
+        }
+    }
+}
+
 class APIService {
     static let shared = APIService()
     private init() {}
@@ -271,30 +328,28 @@ class APIService {
     private let baseUrl = "https://api.themoviedb.org/3"
     private let dionysusServerBaseURL = "https://dionysus-server-py-production.up.railway.app"
 
-    private func fetch<T: Codable>(from url: URL) async throws -> T {
-        let (data, response) = try await URLSession.shared.data(from: url)
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            if let httpResponse = response as? HTTPURLResponse {
-                 print("API Error: Received status code \(httpResponse.statusCode) from \(url)")
-                 if let responseBody = String(data: data, encoding: .utf8) {
-                     print("API Error Body: \(responseBody)")
-                 }
-             } else {
-                 print("API Error: Invalid response from \(url)")
-             }
-            throw URLError(.badServerResponse)
+    private func fetch<T: Codable>(from url: URL, service: String = "TMDB") async throws -> T {
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(from: url)
+        } catch let urlError as URLError where urlError.code == .notConnectedToInternet || urlError.code == .networkConnectionLost {
+            throw APIError.networkUnavailable
+        }
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse(service: service)
+        }
+        guard httpResponse.statusCode == 200 else {
+            let error = APIError.from(httpResponse: httpResponse, data: data, service: service)
+            print("[API] \(service) request failed: \(error.localizedDescription)")
+            throw error
         }
         let decoder = JSONDecoder()
-        // Explicit CodingKeys handle mapping, strategy no longer needed here.
-        // decoder.keyDecodingStrategy = .convertFromSnakeCase
         do {
             return try decoder.decode(T.self, from: data)
         } catch {
-             print("Decoding Error: Failed to decode \(T.self) from \(url). Error: \(error)")
-             if let jsonString = String(data: data, encoding: .utf8) {
-                 print("Raw JSON Response: \(jsonString)")
-             }
-             throw error
+            print("[API] Decoding error for \(T.self) from \(url): \(error)")
+            throw APIError.decodingFailed(type: String(describing: T.self))
         }
     }
 
@@ -342,19 +397,34 @@ class APIService {
             urlString += "&force_refresh=true"
         }
 
-        print("🔍 [API] Searching torrents: \(urlString)")
+        print("[API] Searching torrents: \(urlString)")
         let url = URL(string: urlString)!
 
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(from: url)
+        } catch let urlError as URLError where urlError.code == .notConnectedToInternet || urlError.code == .networkConnectionLost {
+            throw APIError.networkUnavailable
+        }
 
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            print("❌ [API] Torrent search failed. Status: \((response as? HTTPURLResponse)?.statusCode ?? 0)")
-            throw URLError(.badServerResponse)
+            if let httpResponse = response as? HTTPURLResponse {
+                let error = APIError.from(httpResponse: httpResponse, data: data, service: "Dionysus Search")
+                print("[API] Torrent search failed: \(error.localizedDescription)")
+                throw error
+            }
+            throw APIError.invalidResponse(service: "Dionysus Search")
         }
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        let torrentResponse = try decoder.decode(TorrentResponse.self, from: data)
-        return torrentResponse.data
+        do {
+            let torrentResponse = try decoder.decode(TorrentResponse.self, from: data)
+            return torrentResponse.data
+        } catch {
+            print("[API] Decoding error for torrent search: \(error)")
+            throw APIError.decodingFailed(type: "TorrentResponse")
+        }
     }
 
     func fetchUserTorrentHashes() async throws -> Set<String> {
@@ -362,15 +432,22 @@ class APIService {
         var request = URLRequest(url: url)
         request.setValue("Bearer \(SettingsManager.shared.realDebridApiKey)", forHTTPHeaderField: "Authorization")
         
-        print("🔍 [API] Fetching user torrents from: \(url)")
+        print("[API] Fetching user torrents from: \(url)")
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch let urlError as URLError where urlError.code == .notConnectedToInternet || urlError.code == .networkConnectionLost {
+            throw APIError.networkUnavailable
+        }
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            print("❌ [API] Fetch user torrents failed. Status: \((response as? HTTPURLResponse)?.statusCode ?? 0)")
-            if let body = String(data: data, encoding: .utf8) {
-                 print("❌ [API] Response Body: \(body)")
+            if let httpResponse = response as? HTTPURLResponse {
+                let error = APIError.from(httpResponse: httpResponse, data: data, service: "Real-Debrid")
+                print("[API] Fetch user torrents failed: \(error.localizedDescription)")
+                throw error
             }
-            throw URLError(.badServerResponse)
+            throw APIError.invalidResponse(service: "Real-Debrid")
         }
         let userTorrents = try JSONDecoder().decode([RealDebridTorrent].self, from: data)
         return Set(userTorrents.map { $0.hash.lowercased() })
@@ -401,11 +478,11 @@ class APIService {
     }
 
     func addAndSelectTorrent(magnet: String) async throws {
-        print("🔄 [API] Starting Add & Select Torrent flow...")
+        print("[API] Starting Add & Select Torrent flow...")
         let addedTorrent = try await addMagnetToRealDebrid(magnet: magnet)
-        print("✅ [API] Magnet added successfully. Torrent ID: \(addedTorrent.id). Now selecting files...")
+        print("[API] Magnet added successfully. Torrent ID: \(addedTorrent.id). Now selecting files...")
         try await selectTorrentFiles(torrentId: addedTorrent.id)
-        print("✅ [API] Files selected successfully.")
+        print("[API] Files selected successfully.")
     }
 
     private func addMagnetToRealDebrid(magnet: String) async throws -> RealDebridAddTorrentResponse {
@@ -415,23 +492,22 @@ class APIService {
         request.setValue("Bearer \(SettingsManager.shared.realDebridApiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         
-        // FIX: Use custom .urlQueryValueAllowed to ensure '&' and '=' inside the magnet are encoded.
-        // Otherwise, the server sees the magnet link cut off at the first '&'.
+        // Use custom .urlQueryValueAllowed to ensure '&' and '=' inside the magnet are encoded.
         let safeMagnet = magnet.addingPercentEncoding(withAllowedCharacters: .urlQueryValueAllowed) ?? ""
         request.httpBody = "magnet=\(safeMagnet)".data(using: .utf8)
 
-        print("📡 [RD-API] Adding Magnet...")
+        print("[RD-API] Adding Magnet...")
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
-        if let httpResponse = response as? HTTPURLResponse {
-            print("📡 [RD-API] Add Magnet Response Code: \(httpResponse.statusCode)")
-            if httpResponse.statusCode != 201 {
-                 if let body = String(data: data, encoding: .utf8) {
-                     print("❌ [RD-API] Error Body: \(body)")
-                 }
-                throw URLError(.badServerResponse)
-            }
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse(service: "Real-Debrid")
+        }
+        print("[RD-API] Add Magnet Response Code: \(httpResponse.statusCode)")
+        if httpResponse.statusCode != 201 {
+            let error = APIError.from(httpResponse: httpResponse, data: data, service: "Real-Debrid")
+            print("[RD-API] Add Magnet error: \(error.localizedDescription)")
+            throw error
         }
         
         return try JSONDecoder().decode(RealDebridAddTorrentResponse.self, from: data)
@@ -445,18 +521,18 @@ class APIService {
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.httpBody = "files=all".data(using: .utf8)
 
-        print("📡 [RD-API] Selecting all files for torrent: \(torrentId)")
+        print("[RD-API] Selecting all files for torrent: \(torrentId)")
 
         let (data, response) = try await URLSession.shared.data(for: request)
         
-        if let httpResponse = response as? HTTPURLResponse {
-            print("📡 [RD-API] Select Files Response Code: \(httpResponse.statusCode)")
-            if httpResponse.statusCode != 204 {
-                if let body = String(data: data, encoding: .utf8) {
-                     print("❌ [RD-API] Select Files Error: \(body)")
-                 }
-                throw URLError(.badServerResponse)
-            }
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse(service: "Real-Debrid")
+        }
+        print("[RD-API] Select Files Response Code: \(httpResponse.statusCode)")
+        if httpResponse.statusCode != 204 {
+            let error = APIError.from(httpResponse: httpResponse, data: data, service: "Real-Debrid")
+            print("[RD-API] Select Files error: \(error.localizedDescription)")
+            throw error
         }
     }
 
@@ -501,14 +577,14 @@ class APIService {
         let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw URLError(.cannotParseResponse)
+            throw APIError.invalidResponse(service: "Real-Debrid")
         }
 
         if httpResponse.statusCode == 200 {
             return try JSONDecoder().decode(RealDebridTorrentInfo.self, from: data)
         }
 
-        throw URLError(.badServerResponse)
+        throw APIError.from(httpResponse: httpResponse, data: data, service: "Real-Debrid")
     }
 
     func fetchTorrents(page: Int) async throws -> [RealDebridTorrent] {
@@ -519,7 +595,7 @@ class APIService {
         let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw URLError(.cannotParseResponse)
+            throw APIError.invalidResponse(service: "Real-Debrid")
         }
 
         if httpResponse.statusCode == 200 {
@@ -530,7 +606,7 @@ class APIService {
             return []
         }
 
-        throw URLError(.badServerResponse)
+        throw APIError.from(httpResponse: httpResponse, data: data, service: "Real-Debrid")
     }
 
     func deleteTorrent(id: String) async throws {
@@ -542,11 +618,11 @@ class APIService {
         let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw URLError(.cannotParseResponse)
+            throw APIError.invalidResponse(service: "Real-Debrid")
         }
 
         if httpResponse.statusCode != 204 {
-            throw URLError(.badServerResponse)
+            throw APIError.from(httpResponse: httpResponse, data: data, service: "Real-Debrid")
         }
     }
 

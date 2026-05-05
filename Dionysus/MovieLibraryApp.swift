@@ -37,9 +37,10 @@ class HomeViewModel: ObservableObject {
             self.trendingShows = trShows.map(MediaItem.tvShow)
             self.popularShows = popShows.map(MediaItem.tvShow)
             HapticManager.shared.success()
+        } catch let apiError as APIError {
+            self.errorMessage = apiError.localizedDescription
         } catch {
-             self.errorMessage = "Failed to load content. Error: \(error.localizedDescription)"
-             print("Error loading content: \(error)")
+            self.errorMessage = "Failed to load content: \(error.localizedDescription)"
         }
         isLoading = false
     }
@@ -61,8 +62,10 @@ class SearchViewModel: ObservableObject {
         errorMessage = nil
         do {
             searchResults = try await APIService.shared.searchAll(query: query)
+        } catch let apiError as APIError {
+            self.errorMessage = apiError.localizedDescription
         } catch {
-            self.errorMessage = "Search failed."
+            self.errorMessage = "Search failed: \(error.localizedDescription)"
         }
         isLoading = false
     }
@@ -94,8 +97,10 @@ class LibraryViewModel: ObservableObject {
             self.torrents = fetchedTorrents
             self.existingTorrentHashes = fetchedHashes
             HapticManager.shared.success()
+        } catch let apiError as APIError {
+            self.errorMessage = apiError.localizedDescription
         } catch {
-            self.errorMessage = "Failed to fetch sources."
+            self.errorMessage = "Failed to fetch sources: \(error.localizedDescription)"
         }
         isLoading = false
     }

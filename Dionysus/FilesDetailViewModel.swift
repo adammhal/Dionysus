@@ -13,9 +13,10 @@ class FileDetailsViewModel: ObservableObject {
         
         do {
             self.torrentInfo = try await APIService.shared.fetchTorrentInfo(id: id)
+        } catch let apiError as APIError {
+            self.errorMessage = apiError.localizedDescription
         } catch {
-            print("!!! FETCH DETAILS FAILED: \(error.localizedDescription)")
-            self.errorMessage = "Failed to load file details."
+            self.errorMessage = "Failed to load file details: \(error.localizedDescription)"
         }
         
         isLoading = false

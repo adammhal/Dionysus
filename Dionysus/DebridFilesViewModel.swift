@@ -57,9 +57,10 @@ class DebridFilesViewModel: ObservableObject {
                 }
             }
             filterTorrents()
+        } catch let apiError as APIError {
+            self.errorMessage = apiError.localizedDescription
         } catch {
-            print("!!! VM ERROR (loadAllTorrents): \(error.localizedDescription)")
-            self.errorMessage = "Failed to fetch debrid files. Check console."
+            self.errorMessage = "Failed to fetch debrid files: \(error.localizedDescription)"
         }
 
         isLoading = false
@@ -71,9 +72,10 @@ class DebridFilesViewModel: ObservableObject {
             try await APIService.shared.deleteTorrent(id: id)
             allLibraryTorrents.removeAll { $0.id == id }
             filterTorrents()
+        } catch let apiError as APIError {
+            self.errorMessage = apiError.localizedDescription
         } catch {
-            print("!!! VM ERROR (deleteTorrent): \(error.localizedDescription)")
-            self.errorMessage = "Failed to delete torrent. Check console."
+            self.errorMessage = "Failed to delete torrent: \(error.localizedDescription)"
         }
     }
 }

@@ -127,33 +127,37 @@ class LibraryViewModel: ObservableObject {
     func fetchTorrents(for query: String, forceRefresh: Bool = false) async {
         isLoading = true
         errorMessage = nil
-        print("🔎 [LibraryVM] Fetching torrents for query: '\(query)' (Force Refresh: \(forceRefresh))")
+        print("[LibraryVM] Fetching torrents for query: '\(query)' (Force Refresh: \(forceRefresh))")
         do {
             async let searchResult = APIService.shared.searchTorrents(query: query, forceRefresh: forceRefresh)
             async let hashesResult = APIService.shared.fetchUserTorrentHashes()
             let (fetchedTorrents, fetchedHashes) = try await (searchResult, hashesResult)
             self.torrents = fetchedTorrents
             self.existingTorrentHashes = fetchedHashes
-            print("✅ [LibraryVM] Fetched \(fetchedTorrents.count) torrents. Existing hashes: \(fetchedHashes.count)")
+            print("[LibraryVM] Fetched \(fetchedTorrents.count) torrents. Existing hashes: \(fetchedHashes.count)")
         } catch {
-            self.errorMessage = "Failed to fetch sources."
-            print("❌ [LibraryVM] Fetch Error: \(error)")
+            if let apiError = error as? APIError {
+                self.errorMessage = apiError.localizedDescription
+            } else {
+                self.errorMessage = "Failed to fetch sources: \(error.localizedDescription)"
+            }
+            print("[LibraryVM] Fetch Error: \(error)")
         }
         isLoading = false
     }
     
     func addTorrent(magnet: String) async {
-        print("🚀 [LibraryVM] Requesting add for magnet: \(magnet.prefix(30))...")
+        print("[LibraryVM] Requesting add for magnet: \(magnet.prefix(30))...")
         addState = .loading
         do {
             try await APIService.shared.addAndSelectTorrent(magnet: magnet)
             addState = .success
-            print("✨ [LibraryVM] Torrent added successfully!")
+            print("[LibraryVM] Torrent added successfully.")
             if let newHash = Torrent(name: "", size: nil, seeders: nil, leechers: nil, magnet: magnet, quality: nil, provider: nil).infoHash {
                 existingTorrentHashes.insert(newHash)
             }
         } catch {
-            print("💥 [LibraryVM] FAILED to add torrent: \(error.localizedDescription)")
+            print("[LibraryVM] Failed to add torrent: \(error.localizedDescription)")
             addState = .error
         }
     }
@@ -560,7 +564,7 @@ struct SourcesView: View {
                             ForEach(filteredTorrents) { torrent in
                                 let isAdded = torrent.infoHash.flatMap { viewModel.existingTorrentHashes.contains($0) } ?? false
                                 TorrentRowView(torrent: torrent, isAlreadyAdded: isAdded) { magnet in
-                                    print("🔘 [View] Add button tapped for torrent: \(torrent.name)")
+                                    print("[View] Add button tapped for torrent: \(torrent.name)")
                                     Task { await viewModel.addTorrent(magnet: magnet) }
                                 }
                                 .buttonStyle(.card)
