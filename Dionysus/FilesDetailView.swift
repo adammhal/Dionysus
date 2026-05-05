@@ -18,12 +18,25 @@ struct FileDetailsView: View {
                     }
                 } else if let torrentInfo = viewModel.torrentInfo {
                     List(torrentInfo.files) { file in
-                        VStack(alignment: .leading) {
-                            Text(file.path)
-                                .font(.headline)
-                            Text("Size: \(formatFileSize(Int64(file.bytes)))")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
+                        HStack(spacing: 10) {
+                            Image(systemName: file.isSubtitle ? "captions.bubble.fill" : "doc.fill")
+                                .foregroundColor(file.isSubtitle ? .green : .secondary)
+                                .frame(width: 20)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(URL(fileURLWithPath: file.path).lastPathComponent)
+                                    .font(.headline)
+                                    .lineLimit(2)
+                                HStack {
+                                    Text("Size: \(formatFileSize(Int64(file.bytes)))")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                    if let lang = file.subtitleLanguage {
+                                        Text("• \(lang)")
+                                            .font(.subheadline)
+                                            .foregroundColor(.green)
+                                    }
+                                }
+                            }
                         }
                     }
                 } else {

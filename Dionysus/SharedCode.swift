@@ -257,10 +257,44 @@ struct RealDebridFile: Codable, Identifiable, Hashable {
     let selected: Int
 }
 
-struct RealDebridTorrentInfo: Codable {
+extension RealDebridFile {
+    private static let subtitleExtensions: Set<String> = [
+        ".srt", ".vtt", ".ass", ".ssa", ".sub", ".idx", ".smi", ".ttml", ".sup"
+    ]
+
+    var isSubtitle: Bool {
+        let lower = path.lowercased()
+        return RealDebridFile.subtitleExtensions.contains { lower.hasSuffix($0) }
+    }
+
+    var subtitleLanguage: String? {
+        guard isSubtitle else { return nil }
+        let base = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent.lowercased()
+        let parts = base.components(separatedBy: CharacterSet(charactersIn: "._- "))
+        let map: [String: String] = [
+            "english": "English", "eng": "English", "en": "English",
+            "french": "French", "fre": "French", "fra": "French", "fr": "French",
+            "spanish": "Spanish", "spa": "Spanish", "es": "Spanish",
+            "german": "German", "ger": "German", "deu": "German", "de": "German",
+            "portuguese": "Portuguese", "por": "Portuguese", "pt": "Portuguese",
+            "italian": "Italian", "ita": "Italian", "it": "Italian",
+            "dutch": "Dutch", "nld": "Dutch", "nl": "Dutch",
+            "japanese": "Japanese", "jpn": "Japanese", "ja": "Japanese",
+            "korean": "Korean", "kor": "Korean", "ko": "Korean",
+            "chinese": "Chinese", "chi": "Chinese", "zho": "Chinese", "zh": "Chinese",
+            "arabic": "Arabic", "ara": "Arabic", "ar": "Arabic",
+            "russian": "Russian", "rus": "Russian", "ru": "Russian",
+        ]
+        return parts.compactMap { map[$0] }.first
+    }
+}
+
+struct RealDebridTorrentInfo: Codable, Identifiable {
     let id: String
     let filename: String
+    let hash: String
     let bytes: Int
+    let status: String
     let files: [RealDebridFile]
 }
 
@@ -485,6 +519,16 @@ class APIService {
         print("[API] Files selected successfully.")
     }
 
+    func addMagnetForInspection(magnet: String) async throws -> (torrentId: String, info: RealDebridTorrentInfo) {
+        let added = try await addMagnetToRealDebrid(magnet: magnet)
+        let info = try await waitForFileSelection(id: added.id)
+        return (added.id, info)
+    }
+
+    func confirmTorrentSelection(id: String) async throws {
+        try await selectTorrentFiles(torrentId: id)
+    }
+
     private func addMagnetToRealDebrid(magnet: String) async throws -> RealDebridAddTorrentResponse {
         let url = URL(string: "https://api.real-debrid.com/rest/1.0/torrents/addMagnet")!
         var request = URLRequest(url: url)
@@ -536,6 +580,17 @@ class APIService {
         }
     }
 
+    private func waitForFileSelection(id: String) async throws -> RealDebridTorrentInfo {
+        for _ in 0..<15 {
+            let info = try await fetchTorrentInfo(id: id)
+            if info.status != "magnet_conversion" {
+                return info
+            }
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+        }
+        throw APIError.serverError(service: "Real-Debrid", statusCode: 408)
+    }
+
     func fetchMovie(id: Int) async throws -> Movie {
         let url = URL(string: "\(baseUrl)/movie/\(id)?api_key=\(SettingsManager.shared.tmdbApiKey)")!
         return try await fetch(from: url)
@@ -572,7 +627,7 @@ class APIService {
     func fetchTorrentInfo(id: String) async throws -> RealDebridTorrentInfo {
         let url = URL(string: "https://api.real-debrid.com/rest/1.0/torrents/info/\(id)")!
         var request = URLRequest(url: url)
-        request.setValue("Bearer \(Secrets.realDebridApiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(SettingsManager.shared.realDebridApiKey)", forHTTPHeaderField: "Authorization")
 
         let (data, response) = try await URLSession.shared.data(for: request)
 

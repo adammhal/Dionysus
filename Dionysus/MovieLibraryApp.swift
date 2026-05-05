@@ -90,6 +90,8 @@ class LibraryViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var addState: LoadingState = .idle
     @Published var existingTorrentHashes: Set<String> = []
+    @Published var pendingTorrentId: String? = nil
+    @Published var pendingTorrentInfo: RealDebridTorrentInfo? = nil
 
     func fetchTorrents(for query: String, forceRefresh: Bool = false) async {
         isLoading = true
@@ -130,18 +132,38 @@ class LibraryViewModel: ObservableObject {
         isLoading = false
     }
 
-    func addTorrent(magnet: String) async {
+    func startAddTorrent(magnet: String) async {
         addState = .loading
         do {
-            try await APIService.shared.addAndSelectTorrent(magnet: magnet)
-            addState = .success
-            HapticManager.shared.success()
-            if let newHash = Torrent(name: "", size: nil, seeders: nil, leechers: nil, magnet: magnet, quality: nil, provider: nil).infoHash {
-                existingTorrentHashes.insert(newHash)
-            }
+            let (id, info) = try await APIService.shared.addMagnetForInspection(magnet: magnet)
+            pendingTorrentId = id
+            pendingTorrentInfo = info
+            addState = .idle
         } catch {
             addState = .error
         }
+    }
+
+    func confirmTorrent() async {
+        guard let id = pendingTorrentId, let info = pendingTorrentInfo else { return }
+        pendingTorrentId = nil
+        pendingTorrentInfo = nil
+        addState = .loading
+        do {
+            try await APIService.shared.confirmTorrentSelection(id: id)
+            existingTorrentHashes.insert(info.hash.lowercased())
+            addState = .success
+            HapticManager.shared.success()
+        } catch {
+            addState = .error
+        }
+    }
+
+    func cancelPendingTorrent() async {
+        guard let id = pendingTorrentId else { return }
+        pendingTorrentId = nil
+        pendingTorrentInfo = nil
+        try? await APIService.shared.deleteTorrent(id: id)
     }
 }
 
@@ -857,7 +879,7 @@ struct SourcesView: View {
                     else {
                         List(filteredTorrents) { torrent in
                             let isAdded = torrent.infoHash.flatMap { viewModel.existingTorrentHashes.contains($0) } ?? false
-                            TorrentRowView(torrent: torrent, isAlreadyAdded: isAdded) { magnet in Task { await viewModel.addTorrent(magnet: magnet) } }
+                            TorrentRowView(torrent: torrent, isAlreadyAdded: isAdded) { magnet in Task { await viewModel.startAddTorrent(magnet: magnet) } }
                         }
                         .listStyle(.plain)
                     }
@@ -892,6 +914,14 @@ struct SourcesView: View {
             .onChange(of: viewModel.addState) { if viewModel.addState == .success {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { viewModel.addState = .idle }
             }}
+            .sheet(item: $viewModel.pendingTorrentInfo) { info in
+                TorrentFileInspectionView(info: info) {
+                    Task { await viewModel.confirmTorrent() }
+                } onCancel: {
+                    Task { await viewModel.cancelPendingTorrent() }
+                }
+                .presentationDetents([.medium, .large])
+            }
             if viewModel.addState != .idle { StatusOverlayView(addState: $viewModel.addState) }
         }
     }
@@ -1431,6 +1461,108 @@ class ImageCache {
 
 extension String: @retroactive Identifiable {
     public var id: String { self }
+}
+
+struct TorrentFileInspectionView: View {
+    let info: RealDebridTorrentInfo
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    private var subtitleFiles: [RealDebridFile] { info.files.filter { $0.isSubtitle } }
+    private var otherFiles: [RealDebridFile] { info.files.filter { !$0.isSubtitle } }
+    private var detectedLanguages: [String] {
+        Array(Set(subtitleFiles.compactMap { $0.subtitleLanguage })).sorted()
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    if subtitleFiles.isEmpty {
+                        Label("No subtitles found in this torrent", systemImage: "captions.bubble")
+                            .foregroundColor(.secondary)
+                    } else {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Label("Subtitles detected", systemImage: "captions.bubble.fill")
+                                .foregroundColor(.green)
+                            if !detectedLanguages.isEmpty {
+                                Text(detectedLanguages.joined(separator: " • "))
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            } else {
+                                Text("\(subtitleFiles.count) subtitle file(s) — language unknown")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                } header: {
+                    Text("Subtitles")
+                }
+
+                if !subtitleFiles.isEmpty {
+                    Section("Subtitle Files") {
+                        ForEach(subtitleFiles) { file in
+                            HStack(spacing: 10) {
+                                Image(systemName: "captions.bubble.fill")
+                                    .foregroundColor(.green)
+                                    .frame(width: 20)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(URL(fileURLWithPath: file.path).lastPathComponent)
+                                        .font(.custom("Eurostile-Regular", size: 13))
+                                    if let lang = file.subtitleLanguage {
+                                        Text(lang)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Section("Video & Other Files") {
+                    ForEach(otherFiles) { file in
+                        HStack(spacing: 10) {
+                            Image(systemName: "doc.fill")
+                                .foregroundColor(.secondary)
+                                .frame(width: 20)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(URL(fileURLWithPath: file.path).lastPathComponent)
+                                    .font(.custom("Eurostile-Regular", size: 13))
+                                    .lineLimit(2)
+                                Text(formatBytes(file.bytes))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle(info.filename)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { onCancel() }
+                        .foregroundColor(.red)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add to Library") { onConfirm() }
+                        .fontWeight(.semibold)
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private func formatBytes(_ bytes: Int) -> String {
+        let gb = Double(bytes) / 1_073_741_824
+        if gb >= 1 { return String(format: "%.2f GB", gb) }
+        let mb = Double(bytes) / 1_048_576
+        if mb >= 1 { return String(format: "%.2f MB", mb) }
+        return "\(bytes) B"
+    }
 }
 
 #if os(iOS)
