@@ -295,7 +295,12 @@ struct RealDebridTorrentInfo: Codable, Identifiable {
     let hash: String
     let bytes: Int
     let status: String
+    let links: [String]
     let files: [RealDebridFile]
+}
+
+struct RealDebridUnrestrictResponse: Codable {
+    let download: String
 }
 
 enum APIError: LocalizedError {
@@ -589,6 +594,42 @@ class APIService {
             try? await Task.sleep(nanoseconds: 1_000_000_000)
         }
         throw APIError.serverError(service: "Real-Debrid", statusCode: 408)
+    }
+
+    func pollUntilDownloaded(id: String) async throws -> RealDebridTorrentInfo {
+        let terminalErrors: Set<String> = ["error", "dead", "virus", "magnet_error"]
+        for _ in 0..<30 {
+            let info = try await fetchTorrentInfo(id: id)
+            if info.status == "downloaded" { return info }
+            if terminalErrors.contains(info.status) {
+                throw APIError.serverError(service: "Real-Debrid", statusCode: 500)
+            }
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+        }
+        throw APIError.serverError(service: "Real-Debrid", statusCode: 408)
+    }
+
+    func unrestrict(link: String) async throws -> URL {
+        let url = URL(string: "https://api.real-debrid.com/rest/1.0/unrestrict/link")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(SettingsManager.shared.realDebridApiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        let safeLink = link.addingPercentEncoding(withAllowedCharacters: .urlQueryValueAllowed) ?? ""
+        request.httpBody = "link=\(safeLink)".data(using: .utf8)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse(service: "Real-Debrid")
+        }
+        if httpResponse.statusCode != 200 {
+            throw APIError.from(httpResponse: httpResponse, data: data, service: "Real-Debrid")
+        }
+        let result = try JSONDecoder().decode(RealDebridUnrestrictResponse.self, from: data)
+        guard let downloadURL = URL(string: result.download) else {
+            throw APIError.decodingFailed(type: "RealDebridUnrestrictResponse")
+        }
+        return downloadURL
     }
 
     func fetchMovie(id: Int) async throws -> Movie {
