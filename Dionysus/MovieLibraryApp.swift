@@ -941,7 +941,9 @@ struct SourcesView: View {
             .onChange(of: viewModel.addState) { if viewModel.addState == .success {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { viewModel.addState = .idle }
             }}
-            .sheet(item: $viewModel.pendingTorrentInfo) { info in
+            .sheet(item: $viewModel.pendingTorrentInfo, onDismiss: {
+                Task { await viewModel.cancelPendingTorrent() }
+            }) { info in
                 TorrentFileInspectionView(
                     info: info,
                     onConfirm: { Task { await viewModel.confirmTorrent() } },
