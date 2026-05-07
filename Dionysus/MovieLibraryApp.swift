@@ -121,6 +121,7 @@ class LibraryViewModel: ObservableObject {
     @Published var previewStatus: PreviewStatus = .idle
     @Published var previewPlayer: AVPlayer? = nil
     @Published var previewSubtitles: [String] = []
+    @Published var chapterNames: [String]? = nil
 
     init() {
         // Clean up any torrent left pending from a previous session (e.g. force-kill)
@@ -243,14 +244,33 @@ class LibraryViewModel: ObservableObject {
 
     func loadPreview() async {
         previewStatus = .loading
+        chapterNames = nil
         let result = await loadPreviewURL()
         previewSubtitles = result.embeddedSubtitles
         if let url = result.url {
             previewPlayer = AVPlayer(url: url)
             previewStatus = .ready
+            chapterNames = await loadChapterNames(from: url)
         } else {
             previewStatus = .failed
         }
+    }
+
+    private func loadChapterNames(from url: URL) async -> [String] {
+        let asset = AVURLAsset(url: url)
+        guard let locale = (try? await asset.load(.availableChapterLocales))?.first else { return [] }
+        let groups = (try? await asset.loadChapterMetadataGroups(
+            withTitleLocale: locale,
+            containingItemsWithCommonKeys: [.commonKeyTitle]
+        )) ?? []
+        var names: [String] = []
+        for group in groups {
+            if let item = group.items.first(where: { $0.commonKey == .commonKeyTitle }),
+               let title = try? await item.load(.stringValue) {
+                names.append(title)
+            }
+        }
+        return names
     }
 
     func confirmTorrent() async {
@@ -262,6 +282,7 @@ class LibraryViewModel: ObservableObject {
         previewStatus = .idle
         previewPlayer = nil
         previewSubtitles = []
+        chapterNames = nil
         addState = .loading
         do {
             if !alreadySelected {
@@ -283,6 +304,7 @@ class LibraryViewModel: ObservableObject {
         previewStatus = .idle
         previewPlayer = nil
         previewSubtitles = []
+        chapterNames = nil
         try? await APIService.shared.deleteTorrent(id: id)
     }
 }
@@ -1042,6 +1064,7 @@ struct SourcesView: View {
                     previewStatus: viewModel.previewStatus,
                     previewPlayer: viewModel.previewPlayer,
                     embeddedSubtitles: viewModel.previewSubtitles,
+                    chapterNames: viewModel.chapterNames,
                     onConfirm: { Task { await viewModel.confirmTorrent() } },
                     onCancel: { Task { await viewModel.cancelPendingTorrent() } },
                     onLoadPreview: { Task { await viewModel.loadPreview() } }
@@ -1594,6 +1617,7 @@ struct TorrentFileInspectionView: View {
     let previewStatus: LibraryViewModel.PreviewStatus
     let previewPlayer: AVPlayer?
     let embeddedSubtitles: [String]
+    let chapterNames: [String]?
     let onConfirm: () -> Void
     let onCancel: () -> Void
     let onLoadPreview: () -> Void
@@ -1675,6 +1699,26 @@ struct TorrentFileInspectionView: View {
                         )
                         .font(.custom("Eurostile-Regular", size: 13))
                         .foregroundColor(.orange)
+                    }
+                }
+
+                if let names = chapterNames {
+                    Section("Chapters") {
+                        if names.isEmpty {
+                            Label("No chapter markers", systemImage: "list.bullet.below.rectangle")
+                                .foregroundColor(.secondary)
+                                .font(.custom("Eurostile-Regular", size: 14))
+                        } else {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Label("\(names.count) chapter markers", systemImage: "list.bullet.below.rectangle")
+                                    .foregroundColor(.green)
+                                    .font(.custom("Eurostile-Regular", size: 14))
+                                Text(names.prefix(5).joined(separator: " • ") + (names.count > 5 ? " ..." : ""))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 2)
+                        }
                     }
                 }
 
