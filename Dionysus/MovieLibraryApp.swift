@@ -197,9 +197,11 @@ class LibraryViewModel: ObservableObject {
             // In that case there's no per-file index we can trust, so just use links[0].
             let link: String
             if selectedFiles.count == downloaded.links.count {
-                let videoIndex = selectedFiles.enumerated()
+                let videoFiles = selectedFiles.enumerated()
                     .filter { !$0.element.isSubtitle && $0.element.bytes > 0 }
-                    .max(by: { $0.element.bytes < $1.element.bytes })?.offset ?? 0
+                // Always pick the first video file by index (episode 1 for season packs,
+                // only file for movies) so metadata is consistent and reproducible.
+                let videoIndex = videoFiles.min(by: { $0.offset < $1.offset })?.offset ?? 0
                 link = downloaded.links[videoIndex]
             } else {
                 link = downloaded.links[0]
@@ -1625,6 +1627,9 @@ struct TorrentFileInspectionView: View {
     private var subtitleFiles: [RealDebridFile] { info.files.filter { $0.isSubtitle } }
     private var otherFiles: [RealDebridFile] { info.files.filter { !$0.isSubtitle } }
     private var isRarPackaged: Bool { info.files.contains { $0.isRarRelated } }
+    private var isSeasonPack: Bool {
+        info.files.filter { !$0.isSubtitle && !$0.isRarRelated && $0.bytes > 0 }.count > 1
+    }
     private var detectedLanguages: [String] {
         Array(Set(subtitleFiles.compactMap { $0.subtitleLanguage })).sorted()
     }
@@ -1651,25 +1656,34 @@ struct TorrentFileInspectionView: View {
                     }
                 }
 
-                Section("Preview") {
+                Section(isSeasonPack ? "Info" : "Preview") {
                     switch previewStatus {
                     case .idle:
                         Button {
                             onLoadPreview()
                         } label: {
-                            Label("Load Preview & Subtitle Info", systemImage: "play.circle.fill")
-                                .font(.custom("Eurostile-Regular", size: 16))
+                            Label(
+                                isSeasonPack ? "Load Info (Episode 1)" : "Load Preview & Info",
+                                systemImage: isSeasonPack ? "info.circle.fill" : "play.circle.fill"
+                            )
+                            .font(.custom("Eurostile-Regular", size: 16))
                         }
                     case .loading:
                         HStack(spacing: 12) {
                             ProgressView().scaleEffect(0.85)
-                            Text("Preparing preview - this may take a moment...")
+                            Text(isSeasonPack
+                                 ? "Checking episode 1 metadata..."
+                                 : "Preparing preview — this may take a moment...")
                                 .font(.custom("Eurostile-Regular", size: 14))
                                 .foregroundColor(.secondary)
                         }
                         .padding(.vertical, 4)
                     case .ready:
-                        if let player = previewPlayer {
+                        if isSeasonPack {
+                            Label("Metadata checked — Episode 1", systemImage: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                                .font(.custom("Eurostile-Regular", size: 14))
+                        } else if let player = previewPlayer {
                             AZVideoPlayer(
                                 player: player,
                                 willBeginFullScreenPresentationWithAnimationCoordinator: { _, _ in
