@@ -122,6 +122,8 @@ class LibraryViewModel: ObservableObject {
     @Published var previewPlayer: AVPlayer? = nil
     @Published var previewSubtitles: [String] = []
     @Published var chapterNames: [String]? = nil
+    @Published var previewErrorMessage: String? = nil
+    @Published var addErrorMessage: String? = nil
 
     init() {
         // Clean up any torrent left pending from a previous session (e.g. force-kill)
@@ -172,13 +174,18 @@ class LibraryViewModel: ObservableObject {
 
     func startAddTorrent(magnet: String) async {
         addState = .loading
+        addErrorMessage = nil
         do {
             let (id, info) = try await APIService.shared.addMagnetForInspection(magnet: magnet)
             pendingTorrentId = id
             pendingTorrentInfo = info
             addState = .idle
+        } catch let error as APIError {
+            addState = .error
+            addErrorMessage = friendlyMessage(for: error, context: .addMagnet)
         } catch {
             addState = .error
+            addErrorMessage = error.localizedDescription
         }
     }
 
@@ -209,6 +216,7 @@ class LibraryViewModel: ObservableObject {
             let unrestricted = try await APIService.shared.unrestrict(link: link)
             guard unrestricted.isPlayable else {
                 print("[Preview] Not a video (\(unrestricted.mimeType)) — preview unavailable")
+                previewErrorMessage = "File isn't a playable video format (\(unrestricted.mimeType))."
                 return (nil, [])
             }
             // RD download IDs are always 13 base chars + a 3-digit server-routing suffix
@@ -218,6 +226,7 @@ class LibraryViewModel: ObservableObject {
             let subtitles = mediaInfo?.subtitleLanguages ?? []
             guard unrestricted.streamable == 1 else {
                 print("[Preview] Not streamable — preview unavailable")
+                previewErrorMessage = "Real-Debrid can't stream this file — it may need transcoding."
                 return (nil, subtitles)
             }
             let playURL: URL?
@@ -235,17 +244,24 @@ class LibraryViewModel: ObservableObject {
                 playURL = streamURL
             } else {
                 print("[Preview] Transcode unavailable — preview unavailable")
+                previewErrorMessage = "Streaming unavailable for this file."
                 playURL = nil
             }
             return (playURL, subtitles)
+        } catch let error as APIError {
+            print("[Preview] Error: \(error)")
+            previewErrorMessage = friendlyMessage(for: error, context: .preview)
+            return (nil, [])
         } catch {
             print("[Preview] Error: \(error)")
+            previewErrorMessage = error.localizedDescription
             return (nil, [])
         }
     }
 
     func loadPreview() async {
         previewStatus = .loading
+        previewErrorMessage = nil
         chapterNames = nil
         let result = await loadPreviewURL()
         previewSubtitles = result.embeddedSubtitles
@@ -275,6 +291,25 @@ class LibraryViewModel: ObservableObject {
         return names
     }
 
+    private enum ErrorContext { case addMagnet, preview }
+    private func friendlyMessage(for error: APIError, context: ErrorContext) -> String {
+        switch error {
+        case .torrentFailed:
+            return error.localizedDescription ?? "Torrent failed on Real-Debrid."
+        case .serverError(_, 408):
+            switch context {
+            case .addMagnet:
+                return "Timed out resolving the magnet link. The torrent may be invalid or unavailable."
+            case .preview:
+                return "Still downloading after 60 seconds — add it now and check back in Infuse."
+            }
+        case .unauthorized:
+            return "Real-Debrid API key is invalid or expired. Update it in Settings."
+        default:
+            return error.localizedDescription ?? "An unknown error occurred."
+        }
+    }
+
     func confirmTorrent() async {
         guard let id = pendingTorrentId, let info = pendingTorrentInfo else { return }
         let alreadySelected = hasSelectedFiles
@@ -284,6 +319,7 @@ class LibraryViewModel: ObservableObject {
         previewStatus = .idle
         previewPlayer = nil
         previewSubtitles = []
+        previewErrorMessage = nil
         chapterNames = nil
         addState = .loading
         do {
@@ -306,6 +342,7 @@ class LibraryViewModel: ObservableObject {
         previewStatus = .idle
         previewPlayer = nil
         previewSubtitles = []
+        previewErrorMessage = nil
         chapterNames = nil
         try? await APIService.shared.deleteTorrent(id: id)
     }
@@ -1058,6 +1095,14 @@ struct SourcesView: View {
             .onChange(of: viewModel.addState) { if viewModel.addState == .success {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { viewModel.addState = .idle }
             }}
+            .alert("Couldn't Add Torrent", isPresented: Binding(
+                get: { viewModel.addErrorMessage != nil },
+                set: { if !$0 { viewModel.addErrorMessage = nil } }
+            )) {
+                Button("OK", role: .cancel) { viewModel.addErrorMessage = nil }
+            } message: {
+                Text(viewModel.addErrorMessage ?? "")
+            }
             .sheet(item: $viewModel.pendingTorrentInfo, onDismiss: {
                 Task { await viewModel.cancelPendingTorrent() }
             }) { info in
@@ -1067,6 +1112,7 @@ struct SourcesView: View {
                     previewPlayer: viewModel.previewPlayer,
                     embeddedSubtitles: viewModel.previewSubtitles,
                     chapterNames: viewModel.chapterNames,
+                    previewErrorMessage: viewModel.previewErrorMessage,
                     onConfirm: { Task { await viewModel.confirmTorrent() } },
                     onCancel: { Task { await viewModel.cancelPendingTorrent() } },
                     onLoadPreview: { Task { await viewModel.loadPreview() } }
@@ -1620,6 +1666,7 @@ struct TorrentFileInspectionView: View {
     let previewPlayer: AVPlayer?
     let embeddedSubtitles: [String]
     let chapterNames: [String]?
+    let previewErrorMessage: String?
     let onConfirm: () -> Void
     let onCancel: () -> Void
     let onLoadPreview: () -> Void
@@ -1705,14 +1752,16 @@ struct TorrentFileInspectionView: View {
                             .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
                         }
                     case .failed:
-                        Label(
-                            isRarPackaged
-                                ? "Preview unavailable — content is inside a RAR archive"
-                                : "Could not load preview — torrent may still be downloading",
-                            systemImage: "exclamationmark.triangle"
-                        )
-                        .font(.custom("Eurostile-Regular", size: 13))
-                        .foregroundColor(.orange)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Label("Preview unavailable", systemImage: "exclamationmark.triangle")
+                                .font(.custom("Eurostile-Regular", size: 13))
+                                .foregroundColor(.orange)
+                            Text(previewErrorMessage ?? (isRarPackaged
+                                ? "Content is inside a RAR archive — Infuse cannot open RAR files."
+                                : "Could not load preview."))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
 
