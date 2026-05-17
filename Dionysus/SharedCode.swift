@@ -364,6 +364,7 @@ enum APIError: LocalizedError {
     case rateLimited(service: String)
     case unknown(statusCode: Int, body: String?)
     case torrentFailed(status: String)
+    case infringingFile
 
     var errorDescription: String? {
         switch self {
@@ -399,6 +400,8 @@ enum APIError: LocalizedError {
             default: reason = "failed (status: \(status))"
             }
             return "Torrent \(reason) on Real-Debrid."
+        case .infringingFile:
+            return "Real-Debrid has blocked this torrent due to a copyright claim. Try a different source."
         }
     }
 
@@ -413,6 +416,8 @@ enum APIError: LocalizedError {
             return .notFound(endpoint: httpResponse.url?.path ?? "unknown")
         case 429:
             return .rateLimited(service: service)
+        case 451:
+            return .infringingFile
         case 500...599:
             return .serverError(service: service, statusCode: httpResponse.statusCode)
         default:
