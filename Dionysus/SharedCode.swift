@@ -363,6 +363,7 @@ enum APIError: LocalizedError {
     case invalidResponse(service: String)
     case rateLimited(service: String)
     case unknown(statusCode: Int, body: String?)
+    case torrentFailed(status: String)
 
     var errorDescription: String? {
         switch self {
@@ -388,6 +389,16 @@ enum APIError: LocalizedError {
                 message += " Response: \(body)"
             }
             return message
+        case .torrentFailed(let status):
+            let reason: String
+            switch status {
+            case "error": reason = "encountered an error"
+            case "dead": reason = "is no longer available"
+            case "virus": reason = "was flagged as malware"
+            case "magnet_error": reason = "has an invalid magnet link"
+            default: reason = "failed (status: \(status))"
+            }
+            return "Torrent \(reason) on Real-Debrid."
         }
     }
 
@@ -652,7 +663,7 @@ class APIService {
             let info = try await fetchTorrentInfo(id: id)
             if info.status == "downloaded" { return info }
             if terminalErrors.contains(info.status) {
-                throw APIError.serverError(service: "Real-Debrid", statusCode: 500)
+                throw APIError.torrentFailed(status: info.status)
             }
             try? await Task.sleep(nanoseconds: 2_000_000_000)
         }

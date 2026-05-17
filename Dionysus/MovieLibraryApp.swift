@@ -121,6 +121,9 @@ class LibraryViewModel: ObservableObject {
     @Published var previewStatus: PreviewStatus = .idle
     @Published var previewPlayer: AVPlayer? = nil
     @Published var previewSubtitles: [String] = []
+    @Published var chapterNames: [String]? = nil
+    @Published var previewErrorMessage: String? = nil
+    @Published var addErrorMessage: String? = nil
 
     init() {
         // Clean up any torrent left pending from a previous session (e.g. force-kill)
@@ -171,13 +174,18 @@ class LibraryViewModel: ObservableObject {
 
     func startAddTorrent(magnet: String) async {
         addState = .loading
+        addErrorMessage = nil
         do {
             let (id, info) = try await APIService.shared.addMagnetForInspection(magnet: magnet)
             pendingTorrentId = id
             pendingTorrentInfo = info
             addState = .idle
+        } catch let error as APIError {
+            addState = .error
+            addErrorMessage = friendlyMessage(for: error, context: .addMagnet)
         } catch {
             addState = .error
+            addErrorMessage = error.localizedDescription
         }
     }
 
@@ -196,9 +204,11 @@ class LibraryViewModel: ObservableObject {
             // In that case there's no per-file index we can trust, so just use links[0].
             let link: String
             if selectedFiles.count == downloaded.links.count {
-                let videoIndex = selectedFiles.enumerated()
+                let videoFiles = selectedFiles.enumerated()
                     .filter { !$0.element.isSubtitle && $0.element.bytes > 0 }
-                    .max(by: { $0.element.bytes < $1.element.bytes })?.offset ?? 0
+                // Always pick the first video file by index (episode 1 for season packs,
+                // only file for movies) so metadata is consistent and reproducible.
+                let videoIndex = videoFiles.min(by: { $0.offset < $1.offset })?.offset ?? 0
                 link = downloaded.links[videoIndex]
             } else {
                 link = downloaded.links[0]
@@ -206,6 +216,7 @@ class LibraryViewModel: ObservableObject {
             let unrestricted = try await APIService.shared.unrestrict(link: link)
             guard unrestricted.isPlayable else {
                 print("[Preview] Not a video (\(unrestricted.mimeType)) — preview unavailable")
+                previewErrorMessage = "File isn't a playable video format (\(unrestricted.mimeType))."
                 return (nil, [])
             }
             // RD download IDs are always 13 base chars + a 3-digit server-routing suffix
@@ -215,6 +226,7 @@ class LibraryViewModel: ObservableObject {
             let subtitles = mediaInfo?.subtitleLanguages ?? []
             guard unrestricted.streamable == 1 else {
                 print("[Preview] Not streamable — preview unavailable")
+                previewErrorMessage = "Real-Debrid can't stream this file — it may need transcoding."
                 return (nil, subtitles)
             }
             let playURL: URL?
@@ -232,24 +244,69 @@ class LibraryViewModel: ObservableObject {
                 playURL = streamURL
             } else {
                 print("[Preview] Transcode unavailable — preview unavailable")
+                previewErrorMessage = "Streaming unavailable for this file."
                 playURL = nil
             }
             return (playURL, subtitles)
+        } catch let error as APIError {
+            print("[Preview] Error: \(error)")
+            previewErrorMessage = friendlyMessage(for: error, context: .preview)
+            return (nil, [])
         } catch {
             print("[Preview] Error: \(error)")
+            previewErrorMessage = error.localizedDescription
             return (nil, [])
         }
     }
 
     func loadPreview() async {
         previewStatus = .loading
+        previewErrorMessage = nil
+        chapterNames = nil
         let result = await loadPreviewURL()
         previewSubtitles = result.embeddedSubtitles
         if let url = result.url {
             previewPlayer = AVPlayer(url: url)
             previewStatus = .ready
+            chapterNames = await loadChapterNames(from: url)
         } else {
             previewStatus = .failed
+        }
+    }
+
+    private func loadChapterNames(from url: URL) async -> [String] {
+        let asset = AVURLAsset(url: url)
+        guard let locale = (try? await asset.load(.availableChapterLocales))?.first else { return [] }
+        let groups = (try? await asset.loadChapterMetadataGroups(
+            withTitleLocale: locale,
+            containingItemsWithCommonKeys: [.commonKeyTitle]
+        )) ?? []
+        var names: [String] = []
+        for group in groups {
+            if let item = group.items.first(where: { $0.commonKey == .commonKeyTitle }),
+               let title = try? await item.load(.stringValue) {
+                names.append(title)
+            }
+        }
+        return names
+    }
+
+    private enum ErrorContext { case addMagnet, preview }
+    private func friendlyMessage(for error: APIError, context: ErrorContext) -> String {
+        switch error {
+        case .torrentFailed:
+            return error.localizedDescription ?? "Torrent failed on Real-Debrid."
+        case .serverError(_, 408):
+            switch context {
+            case .addMagnet:
+                return "Timed out resolving the magnet link. The torrent may be invalid or unavailable."
+            case .preview:
+                return "Still downloading after 60 seconds — add it now and check back in Infuse."
+            }
+        case .unauthorized:
+            return "Real-Debrid API key is invalid or expired. Update it in Settings."
+        default:
+            return error.localizedDescription ?? "An unknown error occurred."
         }
     }
 
@@ -262,6 +319,8 @@ class LibraryViewModel: ObservableObject {
         previewStatus = .idle
         previewPlayer = nil
         previewSubtitles = []
+        previewErrorMessage = nil
+        chapterNames = nil
         addState = .loading
         do {
             if !alreadySelected {
@@ -283,6 +342,8 @@ class LibraryViewModel: ObservableObject {
         previewStatus = .idle
         previewPlayer = nil
         previewSubtitles = []
+        previewErrorMessage = nil
+        chapterNames = nil
         try? await APIService.shared.deleteTorrent(id: id)
     }
 }
@@ -1034,6 +1095,14 @@ struct SourcesView: View {
             .onChange(of: viewModel.addState) { if viewModel.addState == .success {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { viewModel.addState = .idle }
             }}
+            .alert("Couldn't Add Torrent", isPresented: Binding(
+                get: { viewModel.addErrorMessage != nil },
+                set: { if !$0 { viewModel.addErrorMessage = nil } }
+            )) {
+                Button("OK", role: .cancel) { viewModel.addErrorMessage = nil }
+            } message: {
+                Text(viewModel.addErrorMessage ?? "")
+            }
             .sheet(item: $viewModel.pendingTorrentInfo, onDismiss: {
                 Task { await viewModel.cancelPendingTorrent() }
             }) { info in
@@ -1042,6 +1111,8 @@ struct SourcesView: View {
                     previewStatus: viewModel.previewStatus,
                     previewPlayer: viewModel.previewPlayer,
                     embeddedSubtitles: viewModel.previewSubtitles,
+                    chapterNames: viewModel.chapterNames,
+                    previewErrorMessage: viewModel.previewErrorMessage,
                     onConfirm: { Task { await viewModel.confirmTorrent() } },
                     onCancel: { Task { await viewModel.cancelPendingTorrent() } },
                     onLoadPreview: { Task { await viewModel.loadPreview() } }
@@ -1594,6 +1665,8 @@ struct TorrentFileInspectionView: View {
     let previewStatus: LibraryViewModel.PreviewStatus
     let previewPlayer: AVPlayer?
     let embeddedSubtitles: [String]
+    let chapterNames: [String]?
+    let previewErrorMessage: String?
     let onConfirm: () -> Void
     let onCancel: () -> Void
     let onLoadPreview: () -> Void
@@ -1601,6 +1674,9 @@ struct TorrentFileInspectionView: View {
     private var subtitleFiles: [RealDebridFile] { info.files.filter { $0.isSubtitle } }
     private var otherFiles: [RealDebridFile] { info.files.filter { !$0.isSubtitle } }
     private var isRarPackaged: Bool { info.files.contains { $0.isRarRelated } }
+    private var isSeasonPack: Bool {
+        info.files.filter { !$0.isSubtitle && !$0.isRarRelated && $0.bytes > 0 }.count > 1
+    }
     private var detectedLanguages: [String] {
         Array(Set(subtitleFiles.compactMap { $0.subtitleLanguage })).sorted()
     }
@@ -1627,25 +1703,34 @@ struct TorrentFileInspectionView: View {
                     }
                 }
 
-                Section("Preview") {
+                Section(isSeasonPack ? "Info" : "Preview") {
                     switch previewStatus {
                     case .idle:
                         Button {
                             onLoadPreview()
                         } label: {
-                            Label("Load Preview & Subtitle Info", systemImage: "play.circle.fill")
-                                .font(.custom("Eurostile-Regular", size: 16))
+                            Label(
+                                isSeasonPack ? "Load Info (Episode 1)" : "Load Preview & Info",
+                                systemImage: isSeasonPack ? "info.circle.fill" : "play.circle.fill"
+                            )
+                            .font(.custom("Eurostile-Regular", size: 16))
                         }
                     case .loading:
                         HStack(spacing: 12) {
                             ProgressView().scaleEffect(0.85)
-                            Text("Preparing preview - this may take a moment...")
+                            Text(isSeasonPack
+                                 ? "Checking episode 1 metadata..."
+                                 : "Preparing preview — this may take a moment...")
                                 .font(.custom("Eurostile-Regular", size: 14))
                                 .foregroundColor(.secondary)
                         }
                         .padding(.vertical, 4)
                     case .ready:
-                        if let player = previewPlayer {
+                        if isSeasonPack {
+                            Label("Metadata checked — Episode 1", systemImage: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                                .font(.custom("Eurostile-Regular", size: 14))
+                        } else if let player = previewPlayer {
                             AZVideoPlayer(
                                 player: player,
                                 willBeginFullScreenPresentationWithAnimationCoordinator: { _, _ in
@@ -1667,14 +1752,36 @@ struct TorrentFileInspectionView: View {
                             .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
                         }
                     case .failed:
-                        Label(
-                            isRarPackaged
-                                ? "Preview unavailable — content is inside a RAR archive"
-                                : "Could not load preview — torrent may still be downloading",
-                            systemImage: "exclamationmark.triangle"
-                        )
-                        .font(.custom("Eurostile-Regular", size: 13))
-                        .foregroundColor(.orange)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Label("Preview unavailable", systemImage: "exclamationmark.triangle")
+                                .font(.custom("Eurostile-Regular", size: 13))
+                                .foregroundColor(.orange)
+                            Text(previewErrorMessage ?? (isRarPackaged
+                                ? "Content is inside a RAR archive — Infuse cannot open RAR files."
+                                : "Could not load preview."))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+
+                if let names = chapterNames {
+                    Section("Chapters") {
+                        if names.isEmpty {
+                            Label("No chapter markers", systemImage: "list.bullet.below.rectangle")
+                                .foregroundColor(.secondary)
+                                .font(.custom("Eurostile-Regular", size: 14))
+                        } else {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Label("\(names.count) chapter markers", systemImage: "list.bullet.below.rectangle")
+                                    .foregroundColor(.green)
+                                    .font(.custom("Eurostile-Regular", size: 14))
+                                Text(names.prefix(5).joined(separator: " • ") + (names.count > 5 ? " ..." : ""))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 2)
+                        }
                     }
                 }
 
