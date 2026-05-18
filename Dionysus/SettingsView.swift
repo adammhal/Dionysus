@@ -45,6 +45,12 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+
+                Section("Library") {
+                    NavigationLink(destination: LibraryHealthCheckView()) {
+                        Label("Library Health Check", systemImage: "stethoscope")
+                    }
+                }
             }
             .navigationTitle("Settings")
         }
