@@ -250,6 +250,40 @@ struct RealDebridTorrent: Codable, Identifiable {
     let status: String
 }
 
+extension RealDebridTorrent {
+    var isFailed: Bool {
+        ["error", "dead", "virus", "magnet_error"].contains(status)
+    }
+    var isStuck: Bool {
+        status == "waiting_files_selection"
+    }
+    var statusLabel: String {
+        switch status {
+        case "downloaded":     return "Ready"
+        case "downloading":    return "Downloading"
+        case "queued":         return "Queued"
+        case "compressing":    return "Compressing"
+        case "uploading":      return "Uploading"
+        case "waiting_files_selection": return "Stuck — files not selected"
+        case "magnet_conversion":       return "Resolving magnet"
+        case "error":          return "Failed — re-add recommended"
+        case "dead":           return "Dead torrent — no seeders"
+        case "virus":          return "Blocked — flagged as malware"
+        case "magnet_error":   return "Invalid magnet link"
+        default:               return status
+        }
+    }
+    var statusColor: Color {
+        if isFailed { return .red }
+        if isStuck  { return .orange }
+        switch status {
+        case "downloaded": return .green
+        case "downloading", "queued", "compressing", "uploading": return .blue
+        default: return .secondary
+        }
+    }
+}
+
 struct RealDebridFile: Codable, Identifiable, Hashable {
     let id: Int
     let path: String

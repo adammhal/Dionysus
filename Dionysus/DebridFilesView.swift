@@ -68,17 +68,28 @@ struct DebridFilesView: View {
                 Button(action: {
                     selectedTorrent = torrent
                 }) {
-                    HStack {
-                        VStack(alignment: .leading) {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
                             Text(torrent.filename)
                                 .font(.headline)
-                            Text("Size: \(formatFileSize(Int64(torrent.bytes)))")
+                                .lineLimit(2)
+                            Text(formatFileSize(Int64(torrent.bytes)))
                                 .font(.subheadline)
-                            Text("Status: \(torrent.status)")
-                                .font(.subheadline)
-                                .foregroundColor(statusColor(for: torrent.status))
+                                .foregroundColor(.secondary)
+                            Text(torrent.statusLabel)
+                                .font(.caption)
+                                .foregroundColor(torrent.statusColor)
                         }
                         Spacer()
+                        if torrent.isFailed {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .foregroundColor(.red)
+                                .font(.title3)
+                        } else if torrent.isStuck {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.orange)
+                                .font(.title3)
+                        }
                     }
                     .contentShape(Rectangle())
                 }
@@ -129,16 +140,4 @@ struct DebridFilesView: View {
         }
     }
 
-    private func statusColor(for status: String) -> Color {
-        switch status {
-        case "downloaded":
-            return .green
-        case "downloading":
-            return .blue
-        case "seeding":
-            return .orange
-        default:
-            return .gray
-        }
-    }
 }
