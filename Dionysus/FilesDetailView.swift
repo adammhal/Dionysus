@@ -57,6 +57,27 @@ struct FileDetailsView: View {
                                             .foregroundColor(.green)
                                     }
                                 }
+                                if let health = viewModel.fileHealth[file.id] {
+                                    switch health {
+                                    case .checking:
+                                        HStack(spacing: 4) {
+                                            ProgressView().scaleEffect(0.6)
+                                            Text("Checking…")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    case .infringing:
+                                        Label("Blocked — copyright claim", systemImage: "exclamationmark.circle.fill")
+                                            .font(.caption2)
+                                            .foregroundColor(.red)
+                                    case .failed:
+                                        Label("Couldn't verify link", systemImage: "exclamationmark.triangle.fill")
+                                            .font(.caption2)
+                                            .foregroundColor(.orange)
+                                    case .ok:
+                                        EmptyView()
+                                    }
+                                }
                             }
                         }
                         }
