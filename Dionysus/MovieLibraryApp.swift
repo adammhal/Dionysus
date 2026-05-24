@@ -329,6 +329,9 @@ class LibraryViewModel: ObservableObject {
             existingTorrentHashes.insert(info.hash.lowercased())
             addState = .success
             HapticManager.shared.success()
+            // Silently add+delete a dummy entry to bump the RD library state,
+            // so Infuse detects a change and rescans, picking up the real item.
+            Task.detached { await APIService.shared.addDummyAndDelete() }
         } catch {
             addState = .error
         }
