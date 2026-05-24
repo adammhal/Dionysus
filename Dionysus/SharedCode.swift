@@ -630,6 +630,20 @@ class APIService {
         return (added.id, info)
     }
 
+    func addDummyAndDelete() async {
+        // Syntactically valid but unresolvable hash — RD still creates the entry (201),
+        // changing the library state so Infuse detects a diff on its next scan.
+        let dummy = "magnet:?xt=urn:btih:0000000000000000000000000000000000000000&dn=dummy"
+        do {
+            let added = try await addMagnetToRealDebrid(magnet: dummy)
+            // Give Infuse enough time to pick up the change on its next poll
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            try? await deleteTorrent(id: added.id)
+        } catch {
+            // Best-effort — silently ignore failures
+        }
+    }
+
     func confirmTorrentSelection(id: String) async throws {
         try await selectTorrentFiles(torrentId: id)
     }
