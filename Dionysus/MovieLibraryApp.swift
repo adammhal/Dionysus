@@ -133,7 +133,7 @@ class LibraryViewModel: ObservableObject {
         }
     }
 
-    func fetchTorrents(for query: String, forceRefresh: Bool = false) async {
+    func fetchTorrents(for query: String, tmdbId: Int? = nil, forceRefresh: Bool = false) async {
         isLoading = true
         isWakingServer = false
         errorMessage = nil
@@ -147,7 +147,7 @@ class LibraryViewModel: ObservableObject {
                 try? await Task.sleep(nanoseconds: retryDelays[attempt - 1])
             }
             do {
-                async let searchResult = APIService.shared.searchTorrents(query: query, forceRefresh: forceRefresh)
+                async let searchResult = APIService.shared.searchTorrents(query: query, tmdbId: tmdbId, forceRefresh: forceRefresh)
                 async let hashesResult = APIService.shared.fetchUserTorrentHashes()
                 let (fetchedTorrents, fetchedHashes) = try await (searchResult, hashesResult)
                 self.torrents = fetchedTorrents
@@ -665,6 +665,12 @@ struct MediaDetailView: View {
         (media is TVShow) ? "\(media.title) complete" : "\(media.title) \(releaseYear)"
     }
 
+    // Only movies benefit from backend cache detection (Torrentio's movie endpoint).
+    // TV searches omit the id and fall back to scraper-only results.
+    private var movieTmdbId: Int? {
+        (media as? Movie)?.id
+    }
+
     private var watchStatus: WatchStatus {
         if let movie = media as? Movie {
             return traktService.watchedMovieIDs.contains(movie.id) ? .completed : .unwatched
@@ -746,7 +752,7 @@ struct MediaDetailView: View {
             mainDetailContent
                 .frame(maxWidth: .infinity)
 
-            SourcesView(searchQuery: searchQuery)
+            SourcesView(searchQuery: searchQuery, tmdbId: movieTmdbId)
                 .frame(maxWidth: 450)
                 .background(.black.opacity(0.2))
         }
@@ -784,7 +790,7 @@ struct MediaDetailView: View {
         }
         .sheet(item: $librarySearchQuery) { query in
             NavigationStack {
-                SourcesView(searchQuery: query)
+                SourcesView(searchQuery: query, tmdbId: movieTmdbId)
             }.presentationDetents([.medium, .large])
         }
         .toolbar(.hidden, for: .navigationBar)
@@ -978,6 +984,7 @@ struct WatchProvidersView: View {
 struct SourcesView: View {
     @StateObject private var viewModel = LibraryViewModel()
     let searchQuery: String
+    var tmdbId: Int? = nil
 
     @State private var selectedQuality: String = "All"
     @State private var selectedAVQuality: AVQuality = .normal
@@ -985,8 +992,11 @@ struct SourcesView: View {
     @State private var selectedProvider: String = "All"
     @State private var queryInput: String = ""
     @State private var lastSubmittedQuery: String = ""
+    @State private var instantOnly: Bool = false
 
     private let qualityOptions = ["All", "2160p", "1080p", "720p"]
+
+    private var cachedCount: Int { viewModel.torrents.filter { $0.rdCached == true }.count }
 
     private var finalSearchQuery: String {
         var query = lastSubmittedQuery.isEmpty ? searchQuery : lastSubmittedQuery
@@ -1000,6 +1010,7 @@ struct SourcesView: View {
 
     private var filteredTorrents: [Torrent] {
         var torrents = viewModel.torrents.filter { $0.magnet != nil }
+        if instantOnly { torrents = torrents.filter { $0.rdCached == true } }
         if selectedQuality != "All" { torrents = torrents.filter { $0.quality == selectedQuality } }
         if selectedProvider != "All" { torrents = torrents.filter { $0.provider == selectedProvider } }
         if !filterText.isEmpty { torrents = torrents.filter { $0.name.localizedCaseInsensitiveContains(filterText) } }
@@ -1042,6 +1053,14 @@ struct SourcesView: View {
                         .padding(8)
                         .background(Color(.systemGray6))
                         .cornerRadius(10)
+                    if cachedCount > 0 {
+                        Toggle(isOn: $instantOnly) {
+                            Label("Instant only — \(cachedCount) cached", systemImage: "bolt.fill")
+                                .font(.custom("Eurostile-Regular", size: 14))
+                                .foregroundColor(.yellow)
+                        }
+                        .tint(.yellow)
+                    }
                 }
                 .padding(.horizontal)
                 .padding(.top)
@@ -1058,7 +1077,7 @@ struct SourcesView: View {
                             }
                         }
                     }
-                    else if let errorMessage = viewModel.errorMessage { ErrorView(message: errorMessage) { Task { await viewModel.fetchTorrents(for: finalSearchQuery) } } }
+                    else if let errorMessage = viewModel.errorMessage { ErrorView(message: errorMessage) { Task { await viewModel.fetchTorrents(for: finalSearchQuery, tmdbId: tmdbId) } } }
                     else if filteredTorrents.isEmpty { ContentUnavailableView("No Sources Found", systemImage: "magnifyingglass") }
                     else {
                         List(filteredTorrents) { torrent in
@@ -1083,10 +1102,10 @@ struct SourcesView: View {
                 }
             }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button { Task { await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: true) } } label: { Label("Refresh", systemImage: "arrow.clockwise") }
+                    Button { Task { await viewModel.fetchTorrents(for: finalSearchQuery, tmdbId: tmdbId, forceRefresh: true) } } label: { Label("Refresh", systemImage: "arrow.clockwise") }
                 }
             }
-            .task(id: finalSearchQuery) { await viewModel.fetchTorrents(for: finalSearchQuery, forceRefresh: false) }
+            .task(id: finalSearchQuery) { await viewModel.fetchTorrents(for: finalSearchQuery, tmdbId: tmdbId, forceRefresh: false) }
             .onAppear {
                 queryInput = searchQuery
                 lastSubmittedQuery = searchQuery
@@ -1333,6 +1352,14 @@ struct TorrentRowView: View {
                 HStack {
                     Text(torrent.provider ?? "Unknown").font(.custom("Eurostile-Regular", size: 12)).padding(.horizontal, 8).padding(.vertical, 4).background(Color.blue.opacity(0.3)).cornerRadius(8)
                     if let quality = torrent.quality { Text(quality).font(.custom("Eurostile-Regular", size: 12)).padding(.horizontal, 8).padding(.vertical, 4).background(Color.purple.opacity(0.3)).cornerRadius(8) }
+                    if torrent.rdCached == true {
+                        Label("Instant", systemImage: "bolt.fill")
+                            .font(.custom("Eurostile-Regular", size: 12))
+                            .padding(.horizontal, 8).padding(.vertical, 4)
+                            .background(Color.yellow.opacity(0.25))
+                            .foregroundColor(.yellow)
+                            .cornerRadius(8)
+                    }
                     Spacer()
                 }
                 HStack(spacing: 4) {
