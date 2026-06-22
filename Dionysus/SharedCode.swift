@@ -103,6 +103,7 @@ struct Video: Codable, Identifiable {
 
 struct TorrentResponse: Codable {
     let data: [Torrent]
+    let rdCachedCount: Int?
 }
 
 struct Torrent: Codable, Identifiable, Hashable {
@@ -114,8 +115,15 @@ struct Torrent: Codable, Identifiable, Hashable {
     let magnet: String?
     let quality: String?
     let provider: String?
+    // Real-Debrid cache flag from the backend. true = cached (safe to add),
+    // false = not cached, nil = unknown (no RD token sent or hash unresolvable).
+    let rdCached: Bool?
+    // Torrentio's index of the target video file within the torrent, if known.
+    let fileIdx: Int?
+    // Info-hash provided directly by the backend; preferred over magnet parsing.
+    private let providedInfoHash: String?
 
-    init(name: String, size: String?, seeders: String?, leechers: String?, magnet: String?, quality: String?, provider: String?) {
+    init(name: String, size: String?, seeders: String?, leechers: String?, magnet: String?, quality: String?, provider: String?, rdCached: Bool? = nil, fileIdx: Int? = nil, providedInfoHash: String? = nil) {
             self.name = name
             self.size = size
             self.seeders = seeders
@@ -123,10 +131,15 @@ struct Torrent: Codable, Identifiable, Hashable {
             self.magnet = magnet
             self.quality = quality
             self.provider = provider
+            self.rdCached = rdCached
+            self.fileIdx = fileIdx
+            self.providedInfoHash = providedInfoHash
         }
 
     enum CodingKeys: String, CodingKey {
         case name, size, seeders, leechers, magnet, quality, provider
+        case rdCached, fileIdx
+        case providedInfoHash = "infoHash"
     }
 
     init(from decoder: Decoder) throws {
@@ -137,6 +150,9 @@ struct Torrent: Codable, Identifiable, Hashable {
         magnet = try container.decodeIfPresent(String.self, forKey: .magnet)
         quality = try container.decodeIfPresent(String.self, forKey: .quality)
         provider = try container.decodeIfPresent(String.self, forKey: .provider)
+        rdCached = try container.decodeIfPresent(Bool.self, forKey: .rdCached)
+        fileIdx = try container.decodeIfPresent(Int.self, forKey: .fileIdx)
+        providedInfoHash = try container.decodeIfPresent(String.self, forKey: .providedInfoHash)?.lowercased()
 
         do {
             seeders = try container.decodeIfPresent(String.self, forKey: .seeders)
@@ -159,8 +175,9 @@ struct Torrent: Codable, Identifiable, Hashable {
         }
     }
 
-    
+
     var infoHash: String? {
+        if let providedInfoHash, !providedInfoHash.isEmpty { return providedInfoHash }
         guard let magnet = magnet,
               let range = magnet.range(of: "urn:btih:") else { return nil }
         let hashStartIndex = range.upperBound
@@ -527,11 +544,14 @@ class APIService {
         return response.results.filter { $0.site == "YouTube" }
     }
 
-    func searchTorrents(query: String, forceRefresh: Bool = false) async throws -> [Torrent] {
+    func searchTorrents(query: String, tmdbId: Int? = nil, forceRefresh: Bool = false) async throws -> [Torrent] {
         let torrentApiUrl = "https://dionysus-server-py-production.up.railway.app"
         let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
 
         var urlString = "\(torrentApiUrl)/api/v1/all/search?query=\(encodedQuery)"
+        if let tmdbId {
+            urlString += "&tmdb_id=\(tmdbId)"
+        }
         if forceRefresh {
             urlString += "&force_refresh=true"
         }
@@ -539,10 +559,17 @@ class APIService {
         print("[API] Searching torrents: \(urlString)")
         let url = URL(string: urlString)!
 
+        var request = URLRequest(url: url)
+        // Send the user's RD token so the backend can tag results as cached.
+        let rdToken = SettingsManager.shared.realDebridApiKey
+        if !rdToken.isEmpty {
+            request.setValue(rdToken, forHTTPHeaderField: "X-RD-Token")
+        }
+
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await URLSession.shared.data(from: url)
+            (data, response) = try await URLSession.shared.data(for: request)
         } catch let urlError as URLError where urlError.code == .notConnectedToInternet || urlError.code == .networkConnectionLost {
             throw APIError.networkUnavailable
         }
