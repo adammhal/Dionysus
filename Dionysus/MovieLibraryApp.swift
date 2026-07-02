@@ -133,7 +133,7 @@ class LibraryViewModel: ObservableObject {
         }
     }
 
-    func fetchTorrents(for query: String, tmdbId: Int? = nil, forceRefresh: Bool = false) async {
+    func fetchTorrents(for query: String, imdbId: String? = nil, tmdbId: Int? = nil, forceRefresh: Bool = false) async {
         isLoading = true
         isWakingServer = false
         errorMessage = nil
@@ -147,7 +147,7 @@ class LibraryViewModel: ObservableObject {
                 try? await Task.sleep(nanoseconds: retryDelays[attempt - 1])
             }
             do {
-                async let searchResult = APIService.shared.searchTorrents(query: query, tmdbId: tmdbId, forceRefresh: forceRefresh)
+                async let searchResult = APIService.shared.searchTorrents(query: query, imdbId: imdbId, tmdbId: tmdbId, forceRefresh: forceRefresh)
                 async let hashesResult = APIService.shared.fetchUserTorrentHashes()
                 let (fetchedTorrents, fetchedHashes) = try await (searchResult, hashesResult)
                 self.torrents = fetchedTorrents
@@ -652,6 +652,7 @@ struct MediaDetailView: View {
     @State private var librarySearchQuery: String?
     @State private var themeColors: [Color] = []
     @State private var showProvidersSheet = false
+    @State private var mediaImdbId: String?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -724,10 +725,12 @@ struct MediaDetailView: View {
             async let colorTask: () = fetchAndSetThemeColors()
             async let videoTask: () = fetchVideos()
             async let providersTask: () = fetchProviders()
+            async let imdbFetch = APIService.shared.fetchImdbId(for: media)
             if let show = media as? TVShow {
                 await tvViewModel.fetchDetails(for: show.id)
             }
             _ = await (colorTask, videoTask, providersTask)
+            mediaImdbId = await imdbFetch
             isLoadingProviders = false
         }
         .sheet(isPresented: $showProvidersSheet) {
@@ -752,7 +755,7 @@ struct MediaDetailView: View {
             mainDetailContent
                 .frame(maxWidth: .infinity)
 
-            SourcesView(searchQuery: searchQuery, tmdbId: movieTmdbId)
+            SourcesView(searchQuery: searchQuery, imdbId: mediaImdbId, tmdbId: movieTmdbId)
                 .frame(maxWidth: 450)
                 .background(.black.opacity(0.2))
         }
@@ -790,7 +793,7 @@ struct MediaDetailView: View {
         }
         .sheet(item: $librarySearchQuery) { query in
             NavigationStack {
-                SourcesView(searchQuery: query, tmdbId: movieTmdbId)
+                SourcesView(searchQuery: query, imdbId: mediaImdbId, tmdbId: movieTmdbId)
             }.presentationDetents([.medium, .large])
         }
         .toolbar(.hidden, for: .navigationBar)
@@ -984,6 +987,7 @@ struct WatchProvidersView: View {
 struct SourcesView: View {
     @StateObject private var viewModel = LibraryViewModel()
     let searchQuery: String
+    var imdbId: String? = nil
     var tmdbId: Int? = nil
 
     @State private var selectedQuality: String = "All"
@@ -1077,7 +1081,7 @@ struct SourcesView: View {
                             }
                         }
                     }
-                    else if let errorMessage = viewModel.errorMessage { ErrorView(message: errorMessage) { Task { await viewModel.fetchTorrents(for: finalSearchQuery, tmdbId: tmdbId) } } }
+                    else if let errorMessage = viewModel.errorMessage { ErrorView(message: errorMessage) { Task { await viewModel.fetchTorrents(for: finalSearchQuery, imdbId: imdbId, tmdbId: tmdbId) } } }
                     else if filteredTorrents.isEmpty { ContentUnavailableView("No Sources Found", systemImage: "magnifyingglass") }
                     else {
                         List(filteredTorrents) { torrent in
@@ -1102,10 +1106,10 @@ struct SourcesView: View {
                 }
             }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button { Task { await viewModel.fetchTorrents(for: finalSearchQuery, tmdbId: tmdbId, forceRefresh: true) } } label: { Label("Refresh", systemImage: "arrow.clockwise") }
+                    Button { Task { await viewModel.fetchTorrents(for: finalSearchQuery, imdbId: imdbId, tmdbId: tmdbId, forceRefresh: true) } } label: { Label("Refresh", systemImage: "arrow.clockwise") }
                 }
             }
-            .task(id: finalSearchQuery) { await viewModel.fetchTorrents(for: finalSearchQuery, tmdbId: tmdbId, forceRefresh: false) }
+            .task(id: finalSearchQuery) { await viewModel.fetchTorrents(for: finalSearchQuery, imdbId: imdbId, tmdbId: tmdbId, forceRefresh: false) }
             .onAppear {
                 queryInput = searchQuery
                 lastSubmittedQuery = searchQuery

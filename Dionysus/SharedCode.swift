@@ -106,6 +106,13 @@ struct TorrentResponse: Codable {
     let rdCachedCount: Int?
 }
 
+struct ExternalIds: Codable {
+    let imdbId: String?
+    enum CodingKeys: String, CodingKey {
+        case imdbId = "imdb_id"
+    }
+}
+
 struct Torrent: Codable, Identifiable, Hashable {
     var id: String { magnet ?? name }
     let name: String
@@ -544,12 +551,20 @@ class APIService {
         return response.results.filter { $0.site == "YouTube" }
     }
 
-    func searchTorrents(query: String, tmdbId: Int? = nil, forceRefresh: Bool = false) async throws -> [Torrent] {
+    func fetchImdbId(for media: any Media) async -> String? {
+        let endpoint = media is Movie ? "/movie/\(media.id)/external_ids" : "/tv/\(media.id)/external_ids"
+        let url = URL(string: "\(baseUrl)\(endpoint)?api_key=\(SettingsManager.shared.tmdbApiKey)")!
+        return (try? await fetch(from: url) as ExternalIds)?.imdbId
+    }
+
+    func searchTorrents(query: String, imdbId: String? = nil, tmdbId: Int? = nil, forceRefresh: Bool = false) async throws -> [Torrent] {
         let torrentApiUrl = "https://dionysus-server-py-production.up.railway.app"
         let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
 
         var urlString = "\(torrentApiUrl)/api/v1/all/search?query=\(encodedQuery)"
-        if let tmdbId {
+        if let imdbId {
+            urlString += "&imdb_id=\(imdbId)"
+        } else if let tmdbId {
             urlString += "&tmdb_id=\(tmdbId)"
         }
         if forceRefresh {
